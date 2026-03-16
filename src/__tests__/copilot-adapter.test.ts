@@ -35,7 +35,7 @@ describe('getInstallPaths', () => {
   it('returns correct .github paths for agent', () => {
     const asset = makeAsset({ type: 'agent', name: 'my-agent' });
     const paths = copilotAdapter.getInstallPaths(asset, 'project', projectRoot);
-    expect(paths).toEqual(['/project/.github/agents/my-agent.agent.md']);
+    expect(paths).toEqual(['/project/.github/agents/my-agent.md']);
   });
 
   it('returns correct paths for instruction', () => {
@@ -60,7 +60,7 @@ describe('getInstallPaths', () => {
 describe('transformFiles', () => {
   it('drops Claude-specific frontmatter fields for agent', () => {
     const asset = makeAsset({ type: 'agent' });
-    const content = '---\nname: My Agent\npermissionMode: full\nmaxTurns: 5\ndescription: Test agent\n---\nAgent body';
+    const content = '---\nname: My Agent\npermissionMode: full\nmaxTurns: 5\nmodel: sonnet\ndisallowedTools: Write\ndescription: Test agent\n---\nAgent body';
     const result = copilotAdapter.transformFiles(asset, { 'agent.md': content });
 
     const transformed = Object.values(result)[0];
@@ -68,6 +68,8 @@ describe('transformFiles', () => {
     expect(transformed).toContain('description: Test agent');
     expect(transformed).not.toContain('permissionMode');
     expect(transformed).not.toContain('maxTurns');
+    expect(transformed).not.toContain('model');
+    expect(transformed).not.toContain('disallowedTools');
   });
 
   it('maps PreToolUse to preToolUse and command to bash for hook', () => {

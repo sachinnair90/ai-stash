@@ -19,7 +19,7 @@ export const copilotAdapter: Adapter = {
       case 'skill':
         return asset.files.map(f => path.join(base, 'skills', asset.name, path.basename(f)));
       case 'agent':
-        return [path.join(base, 'agents', `${asset.name}.agent.md`)];
+        return [path.join(base, 'agents', `${asset.name}.md`)];
       case 'instruction': {
         const agentsMd = path.join(projectRoot, 'AGENTS.md');
         const copilotInstructions = path.join(projectRoot, '.github', 'copilot-instructions.md');
@@ -158,7 +158,7 @@ function serializeFrontmatter(fields: Record<string, string>, body: string): str
 // --- Transform helpers ---
 
 const CLAUDE_SPECIFIC_FIELDS = new Set([
-  'permissionMode', 'maxTurns', 'skills', 'hooks', 'memory', 'background', 'isolation',
+  'permissionMode', 'maxTurns', 'skills', 'hooks', 'memory', 'background', 'isolation', 'model', 'disallowedTools',
 ]);
 
 function transformAgentFrontmatter(content: string): string {
@@ -282,7 +282,7 @@ async function removeHookEntries(filePath: string, assetName: string): Promise<v
 function extractAssetName(asset: InstalledAsset): string {
   for (const f of asset.files) {
     const match = f.match(/skills\/([^/]+)\//) ??
-      f.match(/agents\/([^/]+)\.agent\.md$/) ??
+      f.match(/agents\/([^/]+)\.md$/) ??
       f.match(/hooks\/([^/]+)\//) ??
       f.match(/prompts\/([^/]+)\.prompt\.md$/);
     if (match) return match[1];
