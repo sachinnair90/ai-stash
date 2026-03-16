@@ -179,6 +179,53 @@ Commit this file to share your AI assistant setup with your team.
 
 ---
 
+## Testing
+
+### Unit and integration tests
+
+Run the full test suite with Vitest:
+
+```bash
+pnpm run test
+```
+
+Seven test suites cover the core layers:
+
+| File | What it tests |
+|------|---------------|
+| `claude-code-adapter.test.ts` | File path mapping and content transforms for the Claude Code adapter |
+| `copilot-adapter.test.ts` | File path mapping and content transforms for the Copilot adapter |
+| `install-engine.test.ts` | `planInstall`, `dryRunInstall`, and `executeInstall` — conflict detection and file writing |
+| `tui-install.test.ts` | `installAsset()` — the TUI-facing wrapper used by the Install view; regression guard for the adapter registration path |
+| `registry-client.test.ts` | Registry fetch, disk caching, TTL, and offline fallback |
+| `lockfile.test.ts` | Lockfile read, write, and schema validation |
+| `integration.test.ts` | Full install → update → remove lifecycle against a temp directory |
+
+Run a single file:
+
+```bash
+pnpm exec vitest run src/__tests__/tui-install.test.ts
+```
+
+### End-to-end TUI test
+
+`scripts/e2e-tui-test.py` launches the real app in a PTY, drives it with simulated keystrokes, and verifies the full install flow from the user's perspective:
+
+```bash
+python3 scripts/e2e-tui-test.py
+```
+
+This requires a registry server to be running locally (the app's configured registry URL must be reachable). It walks through:
+
+1. Browse view renders with assets loaded
+2. `i` opens the Install view with scope selection
+3. Selecting `project` scope and confirming `claude-code` target runs the install
+4. "Installation complete!" is shown with a `✓` checkmark per file
+5. The file is physically present on disk
+6. The lockfile records the correct file path (non-empty `files` array)
+
+---
+
 ## Contributing
 
 The registry is a separate Git repository. To publish your own skill, agent, or prompt, open a PR against the registry repo with a `manifest.json` and the asset files in the appropriate type folder.
