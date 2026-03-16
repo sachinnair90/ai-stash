@@ -17,7 +17,7 @@ export const copilotAdapter: Adapter = {
 
     switch (assetType) {
       case 'skill':
-        return asset.files.map(f => path.join(base, 'skills', asset.name, f));
+        return asset.files.map(f => path.join(base, 'skills', asset.name, path.basename(f)));
       case 'agent':
         return [path.join(base, 'agents', `${asset.name}.agent.md`)];
       case 'instruction': {

@@ -14,7 +14,7 @@ export const claudeCodeAdapter: Adapter = {
 
     switch (assetType) {
       case 'skill':
-        return asset.files.map(f => path.join(base, 'skills', asset.name, f));
+        return asset.files.map(f => path.join(base, 'skills', asset.name, path.basename(f)));
       case 'agent':
         return [path.join(base, 'agents', `${asset.name}.md`)];
       case 'instruction': {
