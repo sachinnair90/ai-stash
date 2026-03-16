@@ -162,8 +162,8 @@ describe('installAsset (TUI wrapper) — basic install flow', () => {
     const ccPath = path.join(tmpDir, '.claude', 'skills', 'git-commit', 'SKILL.md');
     expect(fs.existsSync(ccPath)).toBe(true);
 
-    // copilot instructions path
-    const copilotPath = path.join(tmpDir, '.github', 'copilot-instructions.md');
+    // copilot skill path (.github/skills/<name>/<file>)
+    const copilotPath = path.join(tmpDir, '.github', 'skills', 'git-commit', 'SKILL.md');
     expect(fs.existsSync(copilotPath)).toBe(true);
   });
 
