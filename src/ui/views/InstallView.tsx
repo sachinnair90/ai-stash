@@ -10,12 +10,14 @@ interface InstallViewProps {
   assets: RegistryAsset[];
   onDone: () => void;
   onCancel: () => void;
+  registryBaseUrl: string;
+  projectRoot: string;
 }
 
 const scopes = ['project', 'global'] as const;
 const targetOptions = ['claude-code', 'copilot'] as const;
 
-export function InstallView({ assets, onDone, onCancel }: InstallViewProps) {
+export function InstallView({ assets, onDone, onCancel, registryBaseUrl, projectRoot }: InstallViewProps) {
   const [step, setStep] = useState<Step>('scope');
   const [scopeIndex, setScopeIndex] = useState(0);
   const [selectedTargets, setSelectedTargets] = useState<Set<string>>(new Set(['claude-code']));
@@ -38,8 +40,8 @@ export function InstallView({ assets, onDone, onCancel }: InstallViewProps) {
       const result = await installAsset(asset, {
         scope: scopes[scopeIndex],
         targets: Array.from(selectedTargets),
-        projectRoot: process.cwd(),
-        registryBaseUrl: '',
+        projectRoot,
+        registryBaseUrl,
       }, (status) => {
         setResults((prev) => {
           const next = new Map(prev);

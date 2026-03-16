@@ -7,18 +7,19 @@ import { removeAsset } from '../../engine/update.js';
 interface RemoveViewProps {
   assetName: string;
   lockfile: Lockfile;
+  projectRoot: string;
   onDone: () => void;
   onCancel: () => void;
 }
 
-export function RemoveView({ assetName, lockfile, onDone, onCancel }: RemoveViewProps) {
+export function RemoveView({ assetName, lockfile, projectRoot, onDone, onCancel }: RemoveViewProps) {
   const asset = lockfile.installed[assetName];
   const [removing, setRemoving] = useState(false);
   const [done, setDone] = useState(false);
 
   const handleRemove = useCallback(async () => {
     setRemoving(true);
-    await removeAsset(assetName, lockfile, process.cwd());
+    await removeAsset(assetName, lockfile, projectRoot);
     setRemoving(false);
     setDone(true);
   }, [assetName, lockfile]);

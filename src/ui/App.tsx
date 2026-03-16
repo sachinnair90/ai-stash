@@ -161,6 +161,8 @@ export function App() {
         <Header viewName="Install" staleWarning={null} />
         <InstallView
           assets={installTargets}
+          registryBaseUrl={registryBaseUrl}
+          projectRoot={projectRoot}
           onDone={() => { refreshLockfile(); setView('browse'); setInstallTargets([]); setSelectedItems(new Set()); }}
           onCancel={() => { setView('browse'); setInstallTargets([]); }}
         />
@@ -176,6 +178,7 @@ export function App() {
           assets={assets}
           lockfile={lockfile}
           registryBaseUrl={registryBaseUrl}
+          projectRoot={projectRoot}
           onDone={() => { refreshLockfile(); setView('browse'); }}
         />
       </Box>
@@ -190,6 +193,7 @@ export function App() {
           <RemoveView
             assetName={removeTarget}
             lockfile={lockfile}
+            projectRoot={projectRoot}
             onDone={() => { refreshLockfile(); setRemoveTarget(null); }}
             onCancel={() => setRemoveTarget(null)}
           />

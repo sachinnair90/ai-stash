@@ -10,10 +10,11 @@ interface UpdateViewProps {
   assets: RegistryAsset[];
   lockfile: Lockfile | null;
   registryBaseUrl: string;
+  projectRoot: string;
   onDone: () => void;
 }
 
-export function UpdateView({ assets, lockfile, registryBaseUrl, onDone }: UpdateViewProps) {
+export function UpdateView({ assets, lockfile, registryBaseUrl, projectRoot, onDone }: UpdateViewProps) {
   const updatable = assets.filter((a) => isUpdateAvailable(lockfile, a.name, a.version));
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [updating, setUpdating] = useState(false);
@@ -23,7 +24,7 @@ export function UpdateView({ assets, lockfile, registryBaseUrl, onDone }: Update
     if (!lockfile || updatable.length === 0) return;
     setUpdating(true);
     const asset = updatable[selectedIndex];
-    const result = await updateAsset(asset, lockfile, process.cwd(), registryBaseUrl);
+    const result = await updateAsset(asset, lockfile, projectRoot, registryBaseUrl);
     setResults((prev) => [...prev, result]);
     setUpdating(false);
   }, [lockfile, updatable, selectedIndex, registryBaseUrl]);
@@ -31,7 +32,7 @@ export function UpdateView({ assets, lockfile, registryBaseUrl, onDone }: Update
   const handleUpdateAll = useCallback(async () => {
     if (!lockfile || updatable.length === 0) return;
     setUpdating(true);
-    const allResults = await updateAll(updatable, lockfile, process.cwd(), registryBaseUrl);
+    const allResults = await updateAll(updatable, lockfile, projectRoot, registryBaseUrl);
     setResults(allResults);
     setUpdating(false);
   }, [lockfile, updatable, registryBaseUrl]);
