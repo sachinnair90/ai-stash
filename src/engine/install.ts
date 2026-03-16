@@ -4,7 +4,7 @@ import type { RegistryAsset } from '../registry/types.js';
 import type { Lockfile, InstalledAsset } from '../lockfile/types.js';
 import type { Config } from '../config/types.js';
 import type { AssetType } from '../adapters/types.js';
-import { getAdapter } from '../adapters/registry.js';
+import { getAdapter } from '../adapters/index.js';
 import { fetchAssetFile } from '../registry/fetcher.js';
 import { writeLockfile } from '../lockfile/writer.js';
 import type {
