@@ -1,0 +1,35 @@
+{
+  "name": "ai-stash",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "CLI tool for managing AI assistant assets",
+  "bin": {
+    "ai-stash": "./dist/cli.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": ["dist/", "README.md"],
+  "exports": { ".": "./dist/cli.js" },
+  "scripts": {
+    "build": "tsc && node -e \"const fs=require('fs');const c=fs.readFileSync('dist/cli.js','utf8');fs.writeFileSync('dist/cli.js','#!/usr/bin/env node\\n'+c)\"",
+    "dev": "tsx src/cli.tsx",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run typecheck && npm run test && npm run build"
+  },
+  "dependencies": {
+    "ink": "^5.1.0",
+    "react": "^18.3.1",
+    "ink-select-input": "^6.0.0",
+    "ink-text-input": "^6.0.0",
+    "ink-spinner": "^5.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "@types/react": "^18.3.0",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "vitest": "^3.0.0"
+  }
+}
