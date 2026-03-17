@@ -145,12 +145,13 @@ export async function updateAsset(
   lockfile: Lockfile,
   projectRoot: string,
   registryBaseUrl: string,
+  githubToken?: string,
 ): Promise<UpdateResult> {
   const installed = lockfile.installed[asset.name];
   const fromVersion = installed?.version ?? '0.0.0';
 
   try {
-    const config: Config = { registry: { name: '', url: registryBaseUrl }, cacheTTL: 3600, defaultTarget: 'claude-code' };
+    const config: Config = { registry: { name: '', url: registryBaseUrl }, cacheTTL: 3600, defaultTarget: 'claude-code', githubToken };
     await updateAssetFull(asset.name, projectRoot, config, lockfile, [asset]);
     return {
       asset: asset.name,
@@ -177,10 +178,11 @@ export async function updateAll(
   lockfile: Lockfile,
   projectRoot: string,
   registryBaseUrl: string,
+  githubToken?: string,
 ): Promise<UpdateResult[]> {
   const results: UpdateResult[] = [];
   for (const asset of assets) {
-    const result = await updateAsset(asset, lockfile, projectRoot, registryBaseUrl);
+    const result = await updateAsset(asset, lockfile, projectRoot, registryBaseUrl, githubToken);
     results.push(result);
   }
   return results;

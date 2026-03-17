@@ -13,7 +13,7 @@
   "exports": { ".": "./dist/cli.js" },
   "scripts": {
     "build": "tsc && node -e \"const fs=require('fs');const c=fs.readFileSync('dist/cli.js','utf8');fs.writeFileSync('dist/cli.js','#!/usr/bin/env node\\n'+c)\"",
-    "dev": "tsx src/cli.tsx",
+    "dev": "tsx --env-file=.env src/cli.tsx",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run typecheck && npm run test && npm run build"

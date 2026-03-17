@@ -20,6 +20,7 @@ export interface InstallOptions {
   targets: string[];
   projectRoot: string;
   registryBaseUrl: string;
+  githubToken?: string;
 }
 
 export interface InstallFileStatus {
@@ -43,11 +44,12 @@ export async function planInstall(
   projectRoot: string,
   lockfile: Lockfile | null,
   registryBaseUrl: string,
+  githubToken?: string,
 ): Promise<InstallPlan> {
   // Fetch all asset files from registry
   const rawFiles: Record<string, string> = {};
   for (const filePath of asset.files) {
-    rawFiles[filePath] = await fetchAssetFile(registryBaseUrl, filePath);
+    rawFiles[filePath] = await fetchAssetFile(registryBaseUrl, filePath, githubToken);
   }
 
   // Transform files through each target adapter
@@ -233,7 +235,7 @@ export async function installAsset(
   options: InstallOptions,
   onProgress?: (status: InstallFileStatus) => void,
 ): Promise<InstallFileResult> {
-  const { scope, targets, projectRoot, registryBaseUrl } = options;
+  const { scope, targets, projectRoot, registryBaseUrl, githubToken } = options;
 
   // Build or load lockfile
   let lockfile: Lockfile;
@@ -257,6 +259,7 @@ export async function installAsset(
       projectRoot,
       lockfile,
       registryBaseUrl,
+      githubToken,
     );
 
     // Notify progress for each file

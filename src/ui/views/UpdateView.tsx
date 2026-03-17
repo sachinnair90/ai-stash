@@ -12,9 +12,10 @@ interface UpdateViewProps {
   registryBaseUrl: string;
   projectRoot: string;
   onDone: () => void;
+  githubToken?: string;
 }
 
-export function UpdateView({ assets, lockfile, registryBaseUrl, projectRoot, onDone }: UpdateViewProps) {
+export function UpdateView({ assets, lockfile, registryBaseUrl, projectRoot, onDone, githubToken }: UpdateViewProps) {
   const updatable = assets.filter((a) => isUpdateAvailable(lockfile, a.name, a.version));
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [updating, setUpdating] = useState(false);
@@ -24,7 +25,7 @@ export function UpdateView({ assets, lockfile, registryBaseUrl, projectRoot, onD
     if (!lockfile || updatable.length === 0) return;
     setUpdating(true);
     const asset = updatable[selectedIndex];
-    const result = await updateAsset(asset, lockfile, projectRoot, registryBaseUrl);
+    const result = await updateAsset(asset, lockfile, projectRoot, registryBaseUrl, githubToken);
     setResults((prev) => [...prev, result]);
     setUpdating(false);
   }, [lockfile, updatable, selectedIndex, registryBaseUrl]);
@@ -32,7 +33,7 @@ export function UpdateView({ assets, lockfile, registryBaseUrl, projectRoot, onD
   const handleUpdateAll = useCallback(async () => {
     if (!lockfile || updatable.length === 0) return;
     setUpdating(true);
-    const allResults = await updateAll(updatable, lockfile, projectRoot, registryBaseUrl);
+    const allResults = await updateAll(updatable, lockfile, projectRoot, registryBaseUrl, githubToken);
     setResults(allResults);
     setUpdating(false);
   }, [lockfile, updatable, registryBaseUrl]);

@@ -7,9 +7,10 @@ import { fetchAssetFile } from '../../registry/fetcher.js';
 interface PreviewPaneProps {
   asset: RegistryAsset | null;
   registryBaseUrl: string;
+  githubToken?: string;
 }
 
-export function PreviewPane({ asset, registryBaseUrl }: PreviewPaneProps) {
+export function PreviewPane({ asset, registryBaseUrl, githubToken }: PreviewPaneProps) {
   const [content, setContent] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,7 +26,7 @@ export function PreviewPane({ asset, registryBaseUrl }: PreviewPaneProps) {
     let cancelled = false;
     setLoading(true);
 
-    fetchAssetFile(registryBaseUrl, asset.files[0])
+    fetchAssetFile(registryBaseUrl, asset.files[0], githubToken)
       .then((text) => {
         if (!cancelled) {
           setContent(text);

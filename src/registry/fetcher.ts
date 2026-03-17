@@ -12,8 +12,12 @@ const BUCKET_TO_TYPE: Record<string, string> = {
   prompts: 'command',
 };
 
-export async function fetchRegistry(url: string): Promise<RegistryIndex> {
-  const response = await fetch(url);
+function authHeaders(token?: string): HeadersInit {
+  return token ? { Authorization: `token ${token}` } : {};
+}
+
+export async function fetchRegistry(url: string, token?: string): Promise<RegistryIndex> {
+  const response = await fetch(url, { headers: authHeaders(token) });
   if (!response.ok) {
     throw new Error(`Failed to fetch registry: ${response.status} ${response.statusText}`);
   }
@@ -41,9 +45,9 @@ export async function fetchRegistry(url: string): Promise<RegistryIndex> {
   };
 }
 
-export async function fetchAssetFile(baseUrl: string, filePath: string): Promise<string> {
+export async function fetchAssetFile(baseUrl: string, filePath: string, token?: string): Promise<string> {
   const url = new URL(filePath, baseUrl).href;
-  const response = await fetch(url);
+  const response = await fetch(url, { headers: authHeaders(token) });
   if (!response.ok) {
     throw new Error(`Failed to fetch asset file ${filePath}: ${response.status} ${response.statusText}`);
   }

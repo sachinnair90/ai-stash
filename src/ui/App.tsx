@@ -41,6 +41,7 @@ export function App() {
   const [assets, setAssets] = useState<RegistryAsset[]>([]);
   const [lockfile, setLockfile] = useState<Lockfile | null>(null);
   const [registryBaseUrl, setRegistryBaseUrl] = useState('');
+  const [githubToken, setGithubToken] = useState<string | undefined>(undefined);
   const [staleWarning, setStaleWarning] = useState<string | null>(null);
   const [projectRoot, setProjectRoot] = useState('');
 
@@ -61,6 +62,7 @@ export function App() {
       try {
         const config = loadConfig();
         setRegistryBaseUrl(config.registry.url);
+        setGithubToken(config.githubToken);
         const root = getProjectRoot(process.cwd()) ?? process.cwd();
         setProjectRoot(root);
         setLockfile(readLockfile(root));
@@ -172,6 +174,7 @@ export function App() {
           assets={installTargets}
           registryBaseUrl={registryBaseUrl}
           projectRoot={projectRoot}
+          githubToken={githubToken}
           onDone={() => { refreshLockfile(); setView('browse'); setInstallTargets([]); setSelectedItems(new Set()); }}
           onCancel={() => { setView('browse'); setInstallTargets([]); }}
         />
@@ -188,6 +191,7 @@ export function App() {
           lockfile={lockfile}
           registryBaseUrl={registryBaseUrl}
           projectRoot={projectRoot}
+          githubToken={githubToken}
           onDone={() => { refreshLockfile(); setView('browse'); }}
         />
       </Box>
@@ -255,6 +259,7 @@ export function App() {
           <PreviewPane
             asset={filtered[selectedIndex] ?? null}
             registryBaseUrl={registryBaseUrl}
+            githubToken={githubToken}
           />
         </Box>
       </Box>

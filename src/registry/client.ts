@@ -12,7 +12,7 @@ export interface RegistryResult {
 export async function getRegistry(config: Config): Promise<RegistryResult> {
   // Try fetching fresh data
   try {
-    const registry = await fetchRegistry(config.registry.url);
+    const registry = await fetchRegistry(config.registry.url, config.githubToken);
     writeCache(registry);
     return { registry, stale: false, cacheAge: 0 };
   } catch {
