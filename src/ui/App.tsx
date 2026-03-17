@@ -10,6 +10,7 @@ import { InstallView } from './views/InstallView.js';
 import { UpdateView } from './views/UpdateView.js';
 import { InstalledView } from './views/InstalledView.js';
 import { RemoveView } from './views/RemoveView.js';
+import { SyncView } from './views/SyncView.js';
 import { useFilter } from './hooks/useFilter.js';
 import type { RegistryAsset } from '../registry/types.js';
 import type { Lockfile } from '../lockfile/types.js';
@@ -17,14 +18,16 @@ import { loadConfig } from '../config/loader.js';
 import { getRegistry } from '../registry/client.js';
 import { readLockfile } from '../lockfile/reader.js';
 import { getProjectRoot } from '../config/paths.js';
+import { getUnsyncedAssets } from '../lockfile/index.js';
 
-export type ViewName = 'browse' | 'install' | 'updates' | 'installed';
+export type ViewName = 'browse' | 'install' | 'updates' | 'installed' | 'sync';
 
 const viewLabels: Record<ViewName, string> = {
   browse: 'Browse',
   install: 'Install',
   updates: 'Updates',
   installed: 'Installed',
+  sync: 'Sync',
 };
 
 // header (2) + search (1) + footer (1)
@@ -51,6 +54,9 @@ export function App() {
   const [removeTarget, setRemoveTarget] = useState<string | null>(null);
   const [installTargets, setInstallTargets] = useState<RegistryAsset[]>([]);
 
+  // Sync state
+  const [unsyncedCount, setUnsyncedCount] = useState(0);
+
   // Browse state
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
@@ -68,6 +74,7 @@ export function App() {
         setLockfile(readLockfile(root));
         const { registry, stale, cacheAge } = await getRegistry(config);
         setAssets(registry.assets);
+        setUnsyncedCount(getUnsyncedAssets(readLockfile(root), root).length);
         if (stale) {
           const mins = Math.round(cacheAge / 60000);
           setStaleWarning(`Using cached registry (${mins}m old)`);
@@ -82,7 +89,11 @@ export function App() {
   }, []);
 
   const refreshLockfile = useCallback(() => {
-    if (projectRoot) setLockfile(readLockfile(projectRoot));
+    if (projectRoot) {
+      const lf = readLockfile(projectRoot);
+      setLockfile(lf);
+      setUnsyncedCount(getUnsyncedAssets(lf, projectRoot).length);
+    }
   }, [projectRoot]);
 
   const toggleSelect = useCallback((name: string) => {
@@ -113,6 +124,7 @@ export function App() {
 
     if (input === 'u') { setView('updates'); return; }
     if (input === 'l') { setView('installed'); return; }
+    if (input === 's' && unsyncedCount > 0) { setView('sync'); return; }
     if (input === '/') { setSearchActive(true); return; }
 
     if (key.escape) {
@@ -225,6 +237,22 @@ export function App() {
     );
   }
 
+  if (view === 'sync') {
+    return (
+      <Box flexDirection="column" width="100%">
+        <Header viewName="Sync" staleWarning={null} />
+        <SyncView
+          lockfile={lockfile}
+          assets={assets}
+          registryBaseUrl={registryBaseUrl}
+          projectRoot={projectRoot}
+          githubToken={githubToken}
+          onDone={() => { refreshLockfile(); setView('browse'); }}
+        />
+      </Box>
+    );
+  }
+
   // Browse view (default)
   return (
     <Box flexDirection="column" width="100%">
@@ -263,7 +291,7 @@ export function App() {
           />
         </Box>
       </Box>
-      <Footer />
+      <Footer unsyncedCount={unsyncedCount} />
     </Box>
   );
 }

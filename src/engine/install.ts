@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { RegistryAsset } from '../registry/types.js';
+import { getUnsyncedAssets } from '../lockfile/index.js';
 import type { Lockfile, InstalledAsset } from '../lockfile/types.js';
 import type { Config } from '../config/types.js';
 import type { AssetType } from '../adapters/types.js';
@@ -307,4 +308,58 @@ export async function installAsset(
       success: false,
     };
   }
+}
+
+export interface SyncResult {
+  installed: string[];
+  skipped: string[];  // asset names not found in registry
+  failed: string[];
+}
+
+/**
+ * Batch-install all lockfile entries whose files are missing on disk.
+ * Scope and targets are read from the lockfile entry — no user prompting.
+ */
+export async function syncFromLockfile(
+  lockfile: Lockfile,
+  registryAssets: RegistryAsset[],
+  projectRoot: string,
+  registryBaseUrl: string,
+  onProgress?: (assetName: string, status: 'installing' | 'done' | 'skipped' | 'failed') => void,
+  githubToken?: string,
+): Promise<SyncResult> {
+  const unsynced = getUnsyncedAssets(lockfile, projectRoot);
+  const byName = new Map(registryAssets.map((a) => [a.name, a]));
+
+  const result: SyncResult = { installed: [], skipped: [], failed: [] };
+
+  for (const { name, asset: lockfileEntry } of unsynced) {
+    const registryAsset = byName.get(name);
+    if (!registryAsset) {
+      result.skipped.push(name);
+      onProgress?.(name, 'skipped');
+      continue;
+    }
+
+    onProgress?.(name, 'installing');
+    try {
+      const plan = await planInstall(
+        registryAsset,
+        lockfileEntry.targets,
+        lockfileEntry.scope as 'project' | 'global',
+        projectRoot,
+        lockfile,
+        registryBaseUrl,
+        githubToken,
+      );
+      await executeInstall(plan, {}, projectRoot, lockfile);
+      result.installed.push(name);
+      onProgress?.(name, 'done');
+    } catch {
+      result.failed.push(name);
+      onProgress?.(name, 'failed');
+    }
+  }
+
+  return result;
 }

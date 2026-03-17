@@ -1,4 +1,6 @@
-import type { Lockfile } from './types.js';
+import fs from 'node:fs';
+import path from 'node:path';
+import type { Lockfile, InstalledAsset } from './types.js';
 
 export function isInstalled(lockfile: Lockfile | null, name: string): boolean {
   if (!lockfile) return false;
@@ -19,6 +21,23 @@ export function isUpdateAvailable(
   const installedVersion = getInstalledVersion(lockfile, name);
   if (!installedVersion) return false;
   return installedVersion !== registryVersion;
+}
+
+export function getUnsyncedAssets(
+  lockfile: Lockfile | null,
+  projectRoot: string,
+): Array<{ name: string; asset: InstalledAsset }> {
+  if (!lockfile) return [];
+  return Object.entries(lockfile.installed)
+    .filter(([, asset]) => {
+      const firstFile = asset.files[0];
+      if (!firstFile) return false;
+      const resolved = path.isAbsolute(firstFile)
+        ? firstFile
+        : path.join(projectRoot, firstFile);
+      return !fs.existsSync(resolved);
+    })
+    .map(([name, asset]) => ({ name, asset }));
 }
 
 export { readLockfile } from './reader.js';

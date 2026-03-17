@@ -1,29 +1,26 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 
-interface KeyHint {
-  key: string;
-  label: string;
+interface FooterProps {
+  unsyncedCount?: number;
 }
 
-const hints: KeyHint[] = [
-  { key: '/', label: 'search' },
-  { key: 'i', label: 'install' },
-  { key: 'u', label: 'updates' },
-  { key: 'l', label: 'installed' },
-  { key: '?', label: 'help' },
-  { key: 'q', label: 'quit' },
-];
-
-export function Footer() {
+export function Footer({ unsyncedCount }: FooterProps) {
   return (
     <Box borderStyle="single" borderTop borderBottom={false} borderLeft={false} borderRight={false} paddingX={1}>
-      {hints.map((hint, idx) => (
-        <Box key={hint.key} marginRight={2}>
-          <Text bold color="cyan">{hint.key}</Text>
-          <Text dimColor> {hint.label}</Text>
+      <Box marginRight={2}><Text bold color="cyan">/</Text><Text dimColor> search</Text></Box>
+      <Box marginRight={2}><Text bold color="cyan">i</Text><Text dimColor> install</Text></Box>
+      <Box marginRight={2}><Text bold color="cyan">u</Text><Text dimColor> updates</Text></Box>
+      <Box marginRight={2}><Text bold color="cyan">l</Text><Text dimColor> installed</Text></Box>
+      {unsyncedCount !== undefined && unsyncedCount > 0 && (
+        <Box marginRight={2}>
+          <Text bold color="yellow">s</Text>
+          <Text dimColor> sync </Text>
+          <Text color="yellow">({unsyncedCount})</Text>
         </Box>
-      ))}
+      )}
+      <Box marginRight={2}><Text bold color="cyan">?</Text><Text dimColor> help</Text></Box>
+      <Box marginRight={2}><Text bold color="cyan">q</Text><Text dimColor> quit</Text></Box>
     </Box>
   );
 }
