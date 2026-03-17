@@ -12,8 +12,26 @@ vi.mock('../config/paths.js', () => ({
 import { readCache, writeCache } from '../registry/cache.js';
 import { fetchRegistry } from '../registry/fetcher.js';
 import { getRegistry } from '../registry/client.js';
-import type { RegistryIndex } from '../registry/types.js';
+import type { RegistryIndex, NestedRegistryIndex } from '../registry/types.js';
 
+// Nested wire format (what registry.json contains)
+const nestedRegistry: NestedRegistryIndex = {
+  version: 1,
+  generatedAt: '2026-01-01T00:00:00Z',
+  skills: [
+    {
+      name: 'test-asset',
+      version: '1.0.0',
+      description: 'A test asset',
+      tags: ['test'],
+      targets: ['claude-code'],
+      files: ['skills/test-asset/main.md'],
+      manifestUrl: 'https://example.com/manifest.json',
+    },
+  ],
+};
+
+// Normalised flat form (what fetchRegistry returns and the cache stores)
 const sampleRegistry: RegistryIndex = {
   version: 1,
   generatedAt: '2026-01-01T00:00:00Z',
@@ -25,7 +43,7 @@ const sampleRegistry: RegistryIndex = {
       description: 'A test asset',
       tags: ['test'],
       targets: ['claude-code'],
-      files: ['main.md'],
+      files: ['skills/test-asset/main.md'],
       manifestUrl: 'https://example.com/manifest.json',
     },
   ],
@@ -36,12 +54,12 @@ describe('fetchRegistry', () => {
     vi.restoreAllMocks();
   });
 
-  it('fetches and parses valid JSON', async () => {
+  it('fetches nested JSON and returns normalised flat form', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({
         ok: true,
-        json: async () => sampleRegistry,
+        json: async () => nestedRegistry,
       }),
     );
 
@@ -49,6 +67,7 @@ describe('fetchRegistry', () => {
     expect(result).toEqual(sampleRegistry);
     expect(result.version).toBe(1);
     expect(result.assets).toHaveLength(1);
+    expect(result.assets[0].type).toBe('skill');
 
     vi.unstubAllGlobals();
   });

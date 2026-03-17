@@ -24,7 +24,7 @@ export const claudeCodeAdapter: Adapter = {
       case 'hook':
         return [
           path.join(base, 'settings.json'),
-          ...asset.files.filter(f => f !== 'hook-config.json').map(f => path.join(base, 'hooks', asset.name, f)),
+          ...asset.files.filter(f => path.basename(f) !== 'hook-config.json').map(f => path.join(base, 'hooks', asset.name, path.basename(f))),
         ];
       case 'prompt':
         return [path.join(base, 'skills', asset.name, 'SKILL.md')];

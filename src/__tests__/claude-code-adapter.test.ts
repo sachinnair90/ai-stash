@@ -54,7 +54,7 @@ describe('getInstallPaths', () => {
   });
 
   it('returns correct paths for hook', () => {
-    const asset = makeAsset({ type: 'hook', name: 'my-hook', files: ['hook-config.json', 'check.sh'] });
+    const asset = makeAsset({ type: 'hook', name: 'my-hook', files: ['hooks/my-hook/hook-config.json', 'hooks/my-hook/check.sh'] });
     const paths = claudeCodeAdapter.getInstallPaths(asset, 'project', projectRoot);
     expect(paths).toEqual([
       '/project/.claude/settings.json',
@@ -107,11 +107,11 @@ describe('transformFiles', () => {
   });
 
   it('filters out hook-config.json for hook type', () => {
-    const asset = makeAsset({ type: 'hook', files: ['hook-config.json', 'check.sh'] });
-    const files = { 'hook-config.json': '{"hooks":[]}', 'check.sh': '#!/bin/bash' };
+    const asset = makeAsset({ type: 'hook', files: ['hooks/my-hook/hook-config.json', 'hooks/my-hook/check.sh'] });
+    const files = { 'hooks/my-hook/hook-config.json': '{"hooks":[]}', 'hooks/my-hook/check.sh': '#!/bin/bash' };
     const result = claudeCodeAdapter.transformFiles(asset, files);
-    expect(result).not.toHaveProperty('hook-config.json');
-    expect(result['check.sh']).toBe('#!/bin/bash');
+    expect(result).not.toHaveProperty('hooks/my-hook/hook-config.json');
+    expect(result['hooks/my-hook/check.sh']).toBe('#!/bin/bash');
   });
 });
 

@@ -24,7 +24,7 @@ describe('getInstallPaths', () => {
   const projectRoot = '/project';
 
   it('returns correct .github paths for skill', () => {
-    const asset = makeAsset({ type: 'skill', files: ['main.md', 'util.md'] });
+    const asset = makeAsset({ type: 'skill', files: ['skills/test-asset/main.md', 'skills/test-asset/util.md'] });
     const paths = copilotAdapter.getInstallPaths(asset, 'project', projectRoot);
     expect(paths).toEqual([
       '/project/.github/skills/test-asset/main.md',
@@ -73,14 +73,14 @@ describe('transformFiles', () => {
   });
 
   it('maps PreToolUse to preToolUse and command to bash for hook', () => {
-    const asset = makeAsset({ type: 'hook', files: ['hook-config.json'] });
+    const asset = makeAsset({ type: 'hook', files: ['hooks/my-hook/hook-config.json'] });
     const hookConfig = JSON.stringify({
       hooks: [
         { name: 'lint', event: 'PreToolUse', command: 'npx eslint' },
         { name: 'test', event: 'PostToolUse', command: 'npm test' },
       ],
     });
-    const result = copilotAdapter.transformFiles(asset, { 'hook-config.json': hookConfig });
+    const result = copilotAdapter.transformFiles(asset, { 'hooks/my-hook/hook-config.json': hookConfig });
 
     const transformed = JSON.parse(Object.values(result)[0]);
     expect(transformed.hooks[0].event).toBe('preToolUse');

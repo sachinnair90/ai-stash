@@ -1,56 +1,55 @@
 {
   "version": 1,
   "generatedAt": "2026-03-16T00:00:00.000Z",
-  "assets": [
+  "skills": [
     {
       "name": "git-commit",
-      "type": "skill",
       "version": "1.0.0",
       "description": "Craft conventional commit messages by analyzing staged diffs — auto-detects type, scope, and generates the commit command.",
       "tags": ["git", "commits", "conventional-commits", "workflow"],
       "targets": ["claude-code"],
-      "files": ["assets/git-commit/SKILL.md"],
-      "manifestUrl": "assets/git-commit/SKILL.md"
+      "files": ["skills/git-commit/SKILL.md"],
+      "manifestUrl": "skills/git-commit/SKILL.md"
     },
     {
       "name": "conventional-commit",
-      "type": "skill",
       "version": "1.0.0",
       "description": "Structured workflow for generating Conventional Commits-compliant messages using an XML prompt template with validation.",
       "tags": ["git", "commits", "conventional-commits", "workflow"],
       "targets": ["copilot", "claude-code"],
-      "files": ["assets/conventional-commit/SKILL.md"],
-      "manifestUrl": "assets/conventional-commit/SKILL.md"
-    },
+      "files": ["skills/conventional-commit/SKILL.md"],
+      "manifestUrl": "skills/conventional-commit/SKILL.md"
+    }
+  ],
+  "agents": [
     {
       "name": "debug-agent",
-      "type": "agent",
       "version": "1.0.0",
       "description": "Systematic four-phase debugging agent: assess → investigate → resolve → QA. Reproduces bugs before fixing and writes a final root-cause report.",
       "tags": ["debugging", "testing", "quality"],
       "targets": ["copilot", "claude-code"],
-      "files": ["assets/debug-agent/agent.md"],
-      "manifestUrl": "assets/debug-agent/agent.md"
-    },
+      "files": ["agents/debug-agent/agent.md"],
+      "manifestUrl": "agents/debug-agent/agent.md"
+    }
+  ],
+  "instructions": [
     {
       "name": "code-review",
-      "type": "instruction",
       "version": "1.0.0",
       "description": "Generic code review guidelines covering security, testing, performance, and architecture — prioritised as CRITICAL / IMPORTANT / SUGGESTION.",
       "tags": ["code-review", "quality", "security", "testing"],
       "targets": ["copilot", "claude-code"],
-      "files": ["assets/code-review/instruction.md"],
-      "manifestUrl": "assets/code-review/instruction.md"
+      "files": ["instructions/code-review/instruction.md"],
+      "manifestUrl": "instructions/code-review/instruction.md"
     },
     {
       "name": "security-owasp",
-      "type": "instruction",
       "version": "1.0.0",
       "description": "Security-first coding instructions based on OWASP Top 10 — covers injection, access control, cryptography, misconfiguration, and more.",
       "tags": ["security", "owasp", "best-practices"],
       "targets": ["copilot", "claude-code"],
-      "files": ["assets/security-owasp/instruction.md"],
-      "manifestUrl": "assets/security-owasp/instruction.md"
+      "files": ["instructions/security-owasp/instruction.md"],
+      "manifestUrl": "instructions/security-owasp/instruction.md"
     }
   ]
 }
