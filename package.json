@@ -9,10 +9,11 @@
   "engines": {
     "node": ">=18"
   },
-  "files": ["dist/", "README.md"],
+  "files": ["dist/", "bundled/", "scripts/postinstall.js", "README.md"],
   "exports": { ".": "./dist/cli.js" },
   "scripts": {
-    "build": "tsc && node -e \"const fs=require('fs');const c=fs.readFileSync('dist/cli.js','utf8');fs.writeFileSync('dist/cli.js','#!/usr/bin/env node\\n'+c)\"",
+    "build": "tsc && node -e \"const fs=require('fs');const c=fs.readFileSync('dist/cli.js','utf8');fs.writeFileSync('dist/cli.js','#!/usr/bin/env node\\n'+c)\" && node -e \"const fs=require('fs');fs.mkdirSync('bundled/skills/add-asset',{recursive:true});fs.copyFileSync('registry/skills/add-asset/SKILL.md','bundled/skills/add-asset/SKILL.md');\"",
+    "postinstall": "node ./scripts/postinstall.js",
     "dev": "tsx --env-file=.env src/cli.tsx",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",

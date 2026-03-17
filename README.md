@@ -331,7 +331,15 @@ Each installed asset entry captures everything needed to reproduce the installat
 
 ## Contributing
 
-The registry is a separate Git repository. To publish your own skill, agent, or prompt, open a PR against the registry repo with a `manifest.json` and the asset files in the appropriate type folder.
+The registry is a separate Git repository. To publish your own skill, agent, or prompt, open a PR against the registry repo with the asset files in the appropriate type folder.
+
+### Developer guides
+
+| Guide | Description |
+|-------|-------------|
+| [Adding an asset](docs/adding-an-asset.md) | Create a new skill, agent, hook, or any other asset and register it in `registry.json` |
+| [Adding an asset type](docs/adding-an-asset-type.md) | Introduce a new category of asset (e.g. `template`) across the type system, adapters, and TUI |
+| [Creating an adapter](docs/creating-an-adapter.md) | Teach ai-stash to install assets for a new AI tool by implementing the `Adapter` interface |
 
 ---
 

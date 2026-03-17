@@ -28,6 +28,33 @@
       "targets": ["claude-code"],
       "files": ["skills/code-review/SKILL.md"],
       "manifestUrl": "skills/code-review/SKILL.md"
+    },
+    {
+      "name": "create-adapter",
+      "version": "1.0.0",
+      "description": "Scaffold a new ai-stash adapter for a new AI tool target — implements the Adapter interface, registers it, and creates tests.",
+      "tags": ["ai-stash", "adapter", "developer", "contributing"],
+      "targets": ["claude-code"],
+      "files": ["skills/create-adapter/SKILL.md"],
+      "manifestUrl": "skills/create-adapter/SKILL.md"
+    },
+    {
+      "name": "add-asset-type",
+      "version": "1.0.0",
+      "description": "Add a new asset type to ai-stash — updates the type union, registry fetcher, both adapters, TUI colour map, and filter hook.",
+      "tags": ["ai-stash", "asset-type", "developer", "contributing"],
+      "targets": ["claude-code"],
+      "files": ["skills/add-asset-type/SKILL.md"],
+      "manifestUrl": "skills/add-asset-type/SKILL.md"
+    },
+    {
+      "name": "add-asset",
+      "version": "1.0.0",
+      "description": "Add a new asset to the ai-stash registry — creates asset files in the correct directory and registers them in registry.json.",
+      "tags": ["ai-stash", "registry", "developer", "contributing"],
+      "targets": ["claude-code"],
+      "files": ["skills/add-asset/SKILL.md"],
+      "manifestUrl": "skills/add-asset/SKILL.md"
     }
   ],
   "agents": [
