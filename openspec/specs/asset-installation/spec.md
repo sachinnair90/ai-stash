@@ -14,18 +14,26 @@ The system SHALL install a selected asset to the correct file locations for each
 - **THEN** the system copies files to `~/.claude/skills/{name}/` (and `~/.copilot/skills/{name}/` for Copilot)
 
 ### Requirement: Choose install scope
-The system SHALL prompt the user to choose between project-local and global installation for each asset.
+The system SHALL prompt the user to choose between project-local and global installation for each asset, UNLESS the scope is provided programmatically (e.g. from a lockfile sync), in which case the prompt SHALL be skipped.
 
-#### Scenario: Scope selection
-- **WHEN** the user initiates an install
+#### Scenario: Scope selection (interactive)
+- **WHEN** the user initiates an install interactively
 - **THEN** the system presents a choice between "project" (relative to current directory) and "global" (`~/.config/...`)
 
-### Requirement: Choose target tools
-The system SHALL allow the user to select which target tools to install for, defaulting to all compatible targets.
+#### Scenario: Scope pre-supplied (sync)
+- **WHEN** an install is triggered by the sync engine with a pre-resolved scope
+- **THEN** the system skips the scope prompt and uses the supplied value
 
-#### Scenario: Multi-target selection
-- **WHEN** the user installs an asset that supports both Claude Code and Copilot
+### Requirement: Choose target tools
+The system SHALL allow the user to select which target tools to install for, defaulting to all compatible targets, UNLESS targets are provided programmatically (e.g. from a lockfile sync), in which case the prompt SHALL be skipped.
+
+#### Scenario: Multi-target selection (interactive)
+- **WHEN** the user installs an asset interactively
 - **THEN** the system presents checkboxes for each compatible target, all checked by default
+
+#### Scenario: Targets pre-supplied (sync)
+- **WHEN** an install is triggered by the sync engine with pre-resolved targets
+- **THEN** the system skips the target prompt and installs for the supplied targets
 
 #### Scenario: Single-target asset
 - **WHEN** the asset supports only one target tool
