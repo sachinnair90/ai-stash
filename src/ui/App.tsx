@@ -96,10 +96,14 @@ export function App() {
       if (input === '?' || key.escape) setShowHelp(false);
       return;
     }
-    if (view !== 'browse') return;
 
+    // Global keys that work in every view
     if (input === 'q') { exit(); return; }
     if (input === '?') { setShowHelp(true); return; }
+    if (key.escape && view !== 'browse') { setView('browse'); return; }
+
+    if (view !== 'browse') return;
+
     if (input === 'u') { setView('updates'); return; }
     if (input === 'l') { setView('installed'); return; }
     if (input === '/') { setSearchActive(true); return; }
