@@ -4,8 +4,12 @@ const BUCKET_TO_TYPE: Record<string, string> = {
   skills: 'skill',
   agents: 'agent',
   instructions: 'instruction',
-  prompts: 'prompt',
+  commands: 'command',
   hooks: 'hook',
+  plugins: 'plugin',
+  mcpServers: 'mcp-server',
+  // Legacy: prompts bucket maps to command for backwards compatibility
+  prompts: 'command',
 };
 
 export async function fetchRegistry(url: string): Promise<RegistryIndex> {

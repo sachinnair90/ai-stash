@@ -1,7 +1,7 @@
 import type { RegistryAsset } from '../registry/types.js';
 import type { InstalledAsset } from '../lockfile/types.js';
 
-export type AssetType = 'skill' | 'agent' | 'instruction' | 'hook' | 'prompt';
+export type AssetType = 'skill' | 'agent' | 'instruction' | 'hook' | 'command' | 'plugin' | 'mcp-server';
 
 export interface Adapter {
   name: string;

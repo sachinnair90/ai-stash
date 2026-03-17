@@ -5,11 +5,13 @@ import type { Lockfile } from '../../lockfile/types.js';
 import { isInstalled, isUpdateAvailable } from '../../lockfile/index.js';
 
 const typeColors: Record<string, string> = {
-  skill: 'cyan',
+  skill: 'green',
   agent: 'blue',
   instruction: 'yellow',
   hook: 'red',
-  prompt: 'magenta',
+  command: 'magenta',
+  plugin: 'cyan',
+  'mcp-server': 'yellowBright',
 };
 
 interface AssetListProps {

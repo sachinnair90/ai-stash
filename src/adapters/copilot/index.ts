@@ -30,8 +30,15 @@ export const copilotAdapter: Adapter = {
       }
       case 'hook':
         return [path.join(base, 'hooks', 'hooks.json')];
-      case 'prompt':
+      case 'command':
         return [path.join(base, 'prompts', `${asset.name}.prompt.md`)];
+      case 'plugin':
+        return asset.files.map(f => {
+          const rel = f.replace(new RegExp(`^plugins/${asset.name}/`), '');
+          return path.join(base, 'plugins', asset.name, rel);
+        });
+      case 'mcp-server':
+        return [path.join(projectRoot, '.vscode', 'mcp.json')];
       default:
         return [];
     }
@@ -66,12 +73,21 @@ export const copilotAdapter: Adapter = {
         }
         return result;
       }
-      case 'prompt': {
+      case 'command': {
         const result: Record<string, string> = {};
         for (const [filePath, content] of Object.entries(files)) {
           result[filePath] = transformPrompt(content);
         }
         return result;
+      }
+      case 'plugin':
+        return files;
+      case 'mcp-server': {
+        // Transform mcpServers → servers key for .vscode/mcp.json format
+        const mcpFile = Object.entries(files).find(([f]) => f.endsWith('mcp.json'));
+        if (!mcpFile) return files;
+        const mcpConfig = JSON.parse(mcpFile[1]) as { mcpServers?: Record<string, unknown> };
+        return { [mcpFile[0]]: JSON.stringify({ servers: mcpConfig.mcpServers ?? {} }, null, 2) };
       }
       default:
         return files;
@@ -84,6 +100,8 @@ export const copilotAdapter: Adapter = {
         return mergeInstruction(assetName, existing, incoming);
       case 'hook':
         return mergeHooks(existing, incoming);
+      case 'mcp-server':
+        return mergeMcpServers(existing, incoming);
       default:
         return incoming;
     }
@@ -91,6 +109,17 @@ export const copilotAdapter: Adapter = {
 
   async removeAsset(asset: InstalledAsset, projectRoot: string): Promise<void> {
     const assetType = asset.type as AssetType;
+
+    if (assetType === 'plugin') {
+      const base = path.join(projectRoot, '.github');
+      const pluginDir = path.join(base, 'plugins', asset.files[0]?.match(/plugins\/([^/]+)\//)?.[1] ?? '');
+      try {
+        await fs.rm(pluginDir, { recursive: true, force: true });
+      } catch {
+        // Directory may already be deleted
+      }
+      return;
+    }
 
     for (const filePath of asset.files) {
       const fullPath = path.resolve(projectRoot, filePath);
@@ -102,6 +131,11 @@ export const copilotAdapter: Adapter = {
 
       if (assetType === 'hook' && filePath.endsWith('hooks.json')) {
         await removeHookEntries(fullPath, extractAssetName(asset));
+        continue;
+      }
+
+      if (assetType === 'mcp-server' && filePath.endsWith('mcp.json')) {
+        await removeMcpServerEntries(fullPath, asset);
         continue;
       }
 
@@ -246,6 +280,32 @@ function mergeHooks(existingJson: string, incomingJson: string): string {
   return JSON.stringify(existing, null, 2);
 }
 
+function mergeMcpServers(existingJson: string, incomingJson: string): string {
+  const existing = JSON.parse(existingJson || '{}') as Record<string, unknown>;
+  const incoming = JSON.parse(incomingJson) as Record<string, unknown>;
+
+  // Copilot uses 'servers' key
+  const existingServers = (existing.servers ?? {}) as Record<string, unknown>;
+  const incomingServers = (incoming.servers ?? {}) as Record<string, unknown>;
+
+  existing.servers = { ...existingServers, ...incomingServers };
+  return JSON.stringify(existing, null, 2);
+}
+
+async function removeMcpServerEntries(filePath: string, asset: InstalledAsset): Promise<void> {
+  try {
+    const content = await fs.readFile(filePath, 'utf-8');
+    const config = JSON.parse(content) as { servers?: Record<string, unknown> };
+    if (!config.servers) return;
+
+    delete config.servers[asset.files[0]?.match(/mcp-servers\/([^/]+)\//)?.[1] ?? ''];
+
+    await fs.writeFile(filePath, JSON.stringify(config, null, 2) + '\n');
+  } catch {
+    // File may not exist
+  }
+}
+
 // --- Remove helpers ---
 
 async function removeInstructionBlock(filePath: string, assetName: string): Promise<void> {
@@ -284,7 +344,8 @@ function extractAssetName(asset: InstalledAsset): string {
     const match = f.match(/skills\/([^/]+)\//) ??
       f.match(/agents\/([^/]+)\.md$/) ??
       f.match(/hooks\/([^/]+)\//) ??
-      f.match(/prompts\/([^/]+)\.prompt\.md$/);
+      f.match(/prompts\/([^/]+)\.prompt\.md$/) ??
+      f.match(/commands\/([^/]+)\.prompt\.md$/);
     if (match) return match[1];
   }
   return 'unknown';

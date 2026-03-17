@@ -24,6 +24,8 @@ export interface NestedRegistryIndex {
   skills?: Omit<RegistryAsset, 'type'>[];
   agents?: Omit<RegistryAsset, 'type'>[];
   instructions?: Omit<RegistryAsset, 'type'>[];
-  prompts?: Omit<RegistryAsset, 'type'>[];
+  commands?: Omit<RegistryAsset, 'type'>[];
   hooks?: Omit<RegistryAsset, 'type'>[];
+  plugins?: Omit<RegistryAsset, 'type'>[];
+  mcpServers?: Omit<RegistryAsset, 'type'>[];
 }

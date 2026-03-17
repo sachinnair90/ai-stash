@@ -62,10 +62,29 @@ describe('getInstallPaths', () => {
     ]);
   });
 
-  it('returns correct paths for prompt', () => {
-    const asset = makeAsset({ type: 'prompt', name: 'my-prompt' });
+  it('returns correct paths for command', () => {
+    const asset = makeAsset({ type: 'command', name: 'my-command' });
     const paths = claudeCodeAdapter.getInstallPaths(asset, 'project', projectRoot);
-    expect(paths).toEqual(['/project/.claude/skills/my-prompt/SKILL.md']);
+    expect(paths).toEqual(['/project/.claude/skills/my-command/SKILL.md']);
+  });
+
+  it('returns correct paths for plugin', () => {
+    const asset = makeAsset({
+      type: 'plugin',
+      name: 'dev-workflow',
+      files: ['plugins/dev-workflow/.claude-plugin/plugin.json', 'plugins/dev-workflow/skills/commit/SKILL.md'],
+    });
+    const paths = claudeCodeAdapter.getInstallPaths(asset, 'project', projectRoot);
+    expect(paths).toEqual([
+      '/project/.claude/plugins/dev-workflow/.claude-plugin/plugin.json',
+      '/project/.claude/plugins/dev-workflow/skills/commit/SKILL.md',
+    ]);
+  });
+
+  it('returns .mcp.json path for mcp-server (project scope)', () => {
+    const asset = makeAsset({ type: 'mcp-server', name: 'github', files: ['mcp-servers/github/mcp.json'] });
+    const paths = claudeCodeAdapter.getInstallPaths(asset, 'project', projectRoot);
+    expect(paths).toEqual(['/project/.mcp.json']);
   });
 });
 
@@ -81,22 +100,37 @@ describe('transformFiles', () => {
     expect(content).toContain('<!-- /ai-stash:coding-standards -->');
   });
 
-  it('adds disable-model-invocation: true to prompt frontmatter', () => {
-    const asset = makeAsset({ type: 'prompt', name: 'my-prompt' });
-    const files = { 'SKILL.md': '---\nname: My Prompt\n---\nContent here' };
+  it('adds disable-model-invocation: true to command frontmatter', () => {
+    const asset = makeAsset({ type: 'command', name: 'my-command' });
+    const files = { 'SKILL.md': '---\nname: My Command\n---\nContent here' };
     const result = claudeCodeAdapter.transformFiles(asset, files);
 
     const content = Object.values(result)[0];
     expect(content).toContain('disable-model-invocation: true');
   });
 
-  it('adds frontmatter with disable-model-invocation when prompt has no frontmatter', () => {
-    const asset = makeAsset({ type: 'prompt', name: 'my-prompt' });
+  it('adds frontmatter with disable-model-invocation when command has no frontmatter', () => {
+    const asset = makeAsset({ type: 'command', name: 'my-command' });
     const files = { 'SKILL.md': 'Just content, no frontmatter' };
     const result = claudeCodeAdapter.transformFiles(asset, files);
 
     const content = Object.values(result)[0];
     expect(content).toContain('---\ndisable-model-invocation: true\n---');
+  });
+
+  it('passes through plugin files unchanged', () => {
+    const asset = makeAsset({ type: 'plugin', name: 'dev-workflow', files: ['plugins/dev-workflow/.claude-plugin/plugin.json'] });
+    const files = { 'plugins/dev-workflow/.claude-plugin/plugin.json': '{"name":"dev-workflow"}' };
+    const result = claudeCodeAdapter.transformFiles(asset, files);
+    expect(result).toEqual(files);
+  });
+
+  it('extracts mcpServers from mcp-server asset mcp.json', () => {
+    const asset = makeAsset({ type: 'mcp-server', name: 'github', files: ['mcp-servers/github/mcp.json'] });
+    const mcpContent = JSON.stringify({ mcpServers: { github: { command: 'npx', args: ['@github/mcp'] } } });
+    const result = claudeCodeAdapter.transformFiles(asset, { 'mcp-servers/github/mcp.json': mcpContent });
+    const parsed = JSON.parse(Object.values(result)[0]);
+    expect(parsed).toHaveProperty('mcpServers.github');
   });
 
   it('passes through skill files unchanged', () => {
@@ -136,6 +170,25 @@ describe('mergeIntoExisting', () => {
     expect(result).not.toContain('Old rules');
     expect(result).toContain('Before');
     expect(result).toContain('After');
+  });
+});
+
+describe('mergeIntoExisting - mcp-server', () => {
+  it('merges mcpServers by key', () => {
+    const existing = JSON.stringify({ mcpServers: { existing: { command: 'npx', args: ['existing'] } } });
+    const incoming = JSON.stringify({ mcpServers: { github: { command: 'npx', args: ['@github/mcp'] } } });
+    const result = claudeCodeAdapter.mergeIntoExisting('github', existing, incoming, 'mcp-server');
+    const parsed = JSON.parse(result) as { mcpServers: Record<string, unknown> };
+    expect(parsed.mcpServers).toHaveProperty('existing');
+    expect(parsed.mcpServers).toHaveProperty('github');
+  });
+
+  it('overwrites existing server key on merge', () => {
+    const existing = JSON.stringify({ mcpServers: { github: { command: 'old' } } });
+    const incoming = JSON.stringify({ mcpServers: { github: { command: 'new' } } });
+    const result = claudeCodeAdapter.mergeIntoExisting('github', existing, incoming, 'mcp-server');
+    const parsed = JSON.parse(result) as { mcpServers: { github: { command: string } } };
+    expect(parsed.mcpServers.github.command).toBe('new');
   });
 });
 

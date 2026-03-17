@@ -10,5 +10,12 @@ export function readLockfile(projectRoot: string): Lockfile | null {
   }
 
   const raw = fs.readFileSync(lockfilePath, 'utf-8');
-  return JSON.parse(raw) as Lockfile;
+  const lockfile = JSON.parse(raw) as Lockfile;
+
+  // Migrate legacy 'prompt' type to 'command'
+  for (const asset of Object.values(lockfile.installed)) {
+    if (asset.type === 'prompt') asset.type = 'command';
+  }
+
+  return lockfile;
 }

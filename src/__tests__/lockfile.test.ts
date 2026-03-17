@@ -51,6 +51,29 @@ describe('readLockfile', () => {
     expect(result!.version).toBe(1);
     expect(result!.installed['my-asset'].version).toBe('1.0.0');
   });
+
+  it('coerces legacy type "prompt" to "command" at read time', () => {
+    const legacyLockfile = {
+      version: 1,
+      registry: 'https://example.com/registry.json',
+      installed: {
+        'my-prompt': {
+          type: 'prompt',
+          version: '1.0.0',
+          installedAt: '2026-01-01T00:00:00Z',
+          targets: ['claude-code'],
+          scope: 'project',
+          files: ['.claude/skills/my-prompt/SKILL.md'],
+        },
+      },
+    };
+
+    const lockfilePath = path.join(tmpDir, 'ai-stash.lock.json');
+    fs.writeFileSync(lockfilePath, JSON.stringify(legacyLockfile, null, 2), 'utf-8');
+
+    const result = readLockfile(tmpDir);
+    expect(result!.installed['my-prompt'].type).toBe('command');
+  });
 });
 
 describe('writeLockfile', () => {

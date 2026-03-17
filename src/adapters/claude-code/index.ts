@@ -26,8 +26,19 @@ export const claudeCodeAdapter: Adapter = {
           path.join(base, 'settings.json'),
           ...asset.files.filter(f => path.basename(f) !== 'hook-config.json').map(f => path.join(base, 'hooks', asset.name, path.basename(f))),
         ];
-      case 'prompt':
+      case 'command':
         return [path.join(base, 'skills', asset.name, 'SKILL.md')];
+      case 'plugin':
+        return asset.files.map(f => {
+          const rel = f.replace(new RegExp(`^plugins/${asset.name}/`), '');
+          return path.join(base, 'plugins', asset.name, rel);
+        });
+      case 'mcp-server': {
+        const mcpPath = scope === 'global'
+          ? path.join(os.homedir(), '.claude', 'mcp.json')
+          : path.join(projectRoot, '.mcp.json');
+        return [mcpPath];
+      }
       default:
         return [];
     }
@@ -55,12 +66,21 @@ export const claudeCodeAdapter: Adapter = {
         }
         return result;
       }
-      case 'prompt': {
+      case 'command': {
         const result: Record<string, string> = {};
         for (const [filePath, content] of Object.entries(files)) {
           result[filePath] = ensureDisableModelInvocation(content);
         }
         return result;
+      }
+      case 'plugin':
+        return files;
+      case 'mcp-server': {
+        // Find mcp.json in the asset files and build the install content
+        const mcpFile = Object.entries(files).find(([f]) => f.endsWith('mcp.json'));
+        if (!mcpFile) return files;
+        const mcpConfig = JSON.parse(mcpFile[1]) as { mcpServers?: Record<string, unknown> };
+        return { [mcpFile[0]]: JSON.stringify({ mcpServers: mcpConfig.mcpServers ?? {} }, null, 2) };
       }
       default:
         return files;
@@ -73,6 +93,8 @@ export const claudeCodeAdapter: Adapter = {
         return mergeInstruction(assetName, existing, incoming);
       case 'hook':
         return mergeHooks(existing, incoming);
+      case 'mcp-server':
+        return mergeMcpServers(existing, incoming);
       default:
         return incoming;
     }
@@ -80,6 +102,17 @@ export const claudeCodeAdapter: Adapter = {
 
   async removeAsset(asset: InstalledAsset, projectRoot: string): Promise<void> {
     const assetType = asset.type as AssetType;
+
+    if (assetType === 'plugin') {
+      const base = path.join(projectRoot, '.claude');
+      const pluginDir = path.join(base, 'plugins', asset.files[0]?.match(/plugins\/([^/]+)\//)?.[1] ?? '');
+      try {
+        await fs.rm(pluginDir, { recursive: true, force: true });
+      } catch {
+        // Directory may already be deleted
+      }
+      return;
+    }
 
     for (const filePath of asset.files) {
       const fullPath = path.resolve(projectRoot, filePath);
@@ -91,6 +124,11 @@ export const claudeCodeAdapter: Adapter = {
 
       if (assetType === 'hook' && filePath.endsWith('settings.json')) {
         await removeHookEntries(fullPath, extractAssetName(asset, filePath));
+        continue;
+      }
+
+      if (assetType === 'mcp-server' && (filePath.endsWith('.mcp.json') || filePath.endsWith('mcp.json'))) {
+        await removeMcpServerEntries(fullPath, asset);
         continue;
       }
 
@@ -190,6 +228,33 @@ async function removeHookEntries(filePath: string, assetName: string): Promise<v
     const hooks = (settings.hooks ?? []) as Array<Record<string, unknown>>;
     settings.hooks = hooks.filter(h => h.name !== assetName);
     await fs.writeFile(filePath, JSON.stringify(settings, null, 2) + '\n');
+  } catch {
+    // File may not exist
+  }
+}
+
+function mergeMcpServers(existingJson: string, incomingJson: string): string {
+  const existing = JSON.parse(existingJson || '{}') as Record<string, unknown>;
+  const incoming = JSON.parse(incomingJson) as Record<string, unknown>;
+
+  const existingServers = (existing.mcpServers ?? {}) as Record<string, unknown>;
+  const incomingServers = (incoming.mcpServers ?? {}) as Record<string, unknown>;
+
+  existing.mcpServers = { ...existingServers, ...incomingServers };
+  return JSON.stringify(existing, null, 2);
+}
+
+async function removeMcpServerEntries(filePath: string, asset: InstalledAsset): Promise<void> {
+  try {
+    const content = await fs.readFile(filePath, 'utf-8');
+    const config = JSON.parse(content) as { mcpServers?: Record<string, unknown> };
+    if (!config.mcpServers) return;
+
+    // Determine which server keys belong to this asset by checking the asset name
+    // Conventionally the server key matches the asset name
+    delete config.mcpServers[asset.files[0]?.match(/mcp-servers\/([^/]+)\//)?.[1] ?? ''];
+
+    await fs.writeFile(filePath, JSON.stringify(config, null, 2) + '\n');
   } catch {
     // File may not exist
   }

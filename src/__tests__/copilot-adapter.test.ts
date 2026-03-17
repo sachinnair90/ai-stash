@@ -50,10 +50,29 @@ describe('getInstallPaths', () => {
     expect(paths).toEqual(['/project/.github/hooks/hooks.json']);
   });
 
-  it('returns correct paths for prompt', () => {
-    const asset = makeAsset({ type: 'prompt', name: 'my-prompt' });
+  it('returns correct paths for command', () => {
+    const asset = makeAsset({ type: 'command', name: 'my-command' });
     const paths = copilotAdapter.getInstallPaths(asset, 'project', projectRoot);
-    expect(paths).toEqual(['/project/.github/prompts/my-prompt.prompt.md']);
+    expect(paths).toEqual(['/project/.github/prompts/my-command.prompt.md']);
+  });
+
+  it('returns correct paths for plugin', () => {
+    const asset = makeAsset({
+      type: 'plugin',
+      name: 'dev-workflow',
+      files: ['plugins/dev-workflow/.claude-plugin/plugin.json', 'plugins/dev-workflow/agents/planner.md'],
+    });
+    const paths = copilotAdapter.getInstallPaths(asset, 'project', projectRoot);
+    expect(paths).toEqual([
+      '/project/.github/plugins/dev-workflow/.claude-plugin/plugin.json',
+      '/project/.github/plugins/dev-workflow/agents/planner.md',
+    ]);
+  });
+
+  it('returns .vscode/mcp.json path for mcp-server', () => {
+    const asset = makeAsset({ type: 'mcp-server', name: 'github', files: ['mcp-servers/github/mcp.json'] });
+    const paths = copilotAdapter.getInstallPaths(asset, 'project', projectRoot);
+    expect(paths).toEqual(['/project/.vscode/mcp.json']);
   });
 });
 
@@ -90,14 +109,31 @@ describe('transformFiles', () => {
     expect(transformed.hooks[1].bash).toBe('npm test');
   });
 
-  it('replaces $ARGUMENTS with ${input:args} for prompt', () => {
-    const asset = makeAsset({ type: 'prompt' });
-    const content = '---\nname: My Prompt\n---\nRun with $ARGUMENTS and more $ARGUMENTS';
-    const result = copilotAdapter.transformFiles(asset, { 'prompt.md': content });
+  it('replaces $ARGUMENTS with ${input:args} for command', () => {
+    const asset = makeAsset({ type: 'command' });
+    const content = '---\nname: My Command\n---\nRun with $ARGUMENTS and more $ARGUMENTS';
+    const result = copilotAdapter.transformFiles(asset, { 'command.md': content });
 
     const transformed = Object.values(result)[0];
     expect(transformed).toContain('${input:args}');
     expect(transformed).not.toContain('$ARGUMENTS');
+  });
+
+  it('passes through plugin files unchanged', () => {
+    const asset = makeAsset({ type: 'plugin', name: 'dev-workflow', files: ['plugins/dev-workflow/.claude-plugin/plugin.json'] });
+    const files = { 'plugins/dev-workflow/.claude-plugin/plugin.json': '{"name":"dev-workflow"}' };
+    const result = copilotAdapter.transformFiles(asset, files);
+    expect(result).toEqual(files);
+  });
+
+  it('transforms mcp-server mcpServers → servers key', () => {
+    const asset = makeAsset({ type: 'mcp-server', name: 'github', files: ['mcp-servers/github/mcp.json'] });
+    const mcpContent = JSON.stringify({ mcpServers: { github: { command: 'npx', args: ['@github/mcp'] } } });
+    const result = copilotAdapter.transformFiles(asset, { 'mcp-servers/github/mcp.json': mcpContent });
+    const parsed = JSON.parse(Object.values(result)[0]) as Record<string, unknown>;
+    expect(parsed).toHaveProperty('servers');
+    expect(parsed).not.toHaveProperty('mcpServers');
+    expect((parsed.servers as Record<string, unknown>)).toHaveProperty('github');
   });
 
   it('wraps instruction content in section markers', () => {
@@ -133,6 +169,17 @@ describe('mergeIntoExisting', () => {
     expect(result).not.toContain('Old rules');
     expect(result).toContain('Before');
     expect(result).toContain('After');
+  });
+});
+
+describe('mergeIntoExisting - mcp-server', () => {
+  it('merges servers by key for .vscode/mcp.json', () => {
+    const existing = JSON.stringify({ servers: { existing: { command: 'npx', args: ['existing'] } } });
+    const incoming = JSON.stringify({ servers: { github: { command: 'npx', args: ['@github/mcp'] } } });
+    const result = copilotAdapter.mergeIntoExisting('github', existing, incoming, 'mcp-server');
+    const parsed = JSON.parse(result) as { servers: Record<string, unknown> };
+    expect(parsed.servers).toHaveProperty('existing');
+    expect(parsed.servers).toHaveProperty('github');
   });
 });
 

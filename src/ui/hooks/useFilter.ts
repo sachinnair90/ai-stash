@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import type { RegistryAsset } from '../../registry/types.js';
 
-export type AssetType = 'skill' | 'agent' | 'instruction' | 'hook' | 'prompt';
+export type AssetType = 'skill' | 'agent' | 'instruction' | 'hook' | 'command' | 'plugin' | 'mcp-server';
 
 interface UseFilterResult {
   search: string;

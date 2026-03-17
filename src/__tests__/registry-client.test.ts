@@ -29,9 +29,42 @@ const nestedRegistry: NestedRegistryIndex = {
       manifestUrl: 'https://example.com/manifest.json',
     },
   ],
+  commands: [
+    {
+      name: 'test-command',
+      version: '1.0.0',
+      description: 'A test command',
+      tags: ['test'],
+      targets: ['claude-code'],
+      files: ['commands/test-command/command.md'],
+      manifestUrl: 'https://example.com/manifest.json',
+    },
+  ],
+  plugins: [
+    {
+      name: 'test-plugin',
+      version: '1.0.0',
+      description: 'A test plugin',
+      tags: ['test'],
+      targets: ['claude-code'],
+      files: ['plugins/test-plugin/.claude-plugin/plugin.json'],
+      manifestUrl: 'https://example.com/manifest.json',
+    },
+  ],
+  mcpServers: [
+    {
+      name: 'test-mcp',
+      version: '1.0.0',
+      description: 'A test MCP server',
+      tags: ['test'],
+      targets: ['claude-code'],
+      files: ['mcp-servers/test-mcp/mcp.json'],
+      manifestUrl: 'https://example.com/manifest.json',
+    },
+  ],
 };
 
-// Normalised flat form (what fetchRegistry returns and the cache stores)
+// Normalised flat form (what fetchRegistry returns and the cache stores) — single skill used for cache tests
 const sampleRegistry: RegistryIndex = {
   version: 1,
   generatedAt: '2026-01-01T00:00:00Z',
@@ -64,10 +97,43 @@ describe('fetchRegistry', () => {
     );
 
     const result = await fetchRegistry('https://example.com/registry.json');
-    expect(result).toEqual(sampleRegistry);
     expect(result.version).toBe(1);
+    expect(result.assets.find(a => a.name === 'test-asset')?.type).toBe('skill');
+    expect(result.assets.find(a => a.name === 'test-command')?.type).toBe('command');
+    expect(result.assets.find(a => a.name === 'test-plugin')?.type).toBe('plugin');
+    expect(result.assets.find(a => a.name === 'test-mcp')?.type).toBe('mcp-server');
+
+    vi.unstubAllGlobals();
+  });
+
+  it('maps legacy prompts bucket to command type', async () => {
+    const legacyRegistry = {
+      version: 1,
+      generatedAt: '2026-01-01T00:00:00Z',
+      prompts: [
+        {
+          name: 'legacy-prompt',
+          version: '1.0.0',
+          description: 'A legacy prompt',
+          tags: [],
+          targets: ['claude-code'],
+          files: ['prompts/legacy-prompt/prompt.md'],
+          manifestUrl: 'https://example.com/manifest.json',
+        },
+      ],
+    };
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => legacyRegistry,
+      }),
+    );
+
+    const result = await fetchRegistry('https://example.com/registry.json');
     expect(result.assets).toHaveLength(1);
-    expect(result.assets[0].type).toBe('skill');
+    expect(result.assets[0].type).toBe('command');
 
     vi.unstubAllGlobals();
   });
