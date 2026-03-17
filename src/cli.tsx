@@ -4,8 +4,22 @@ if (nodeVersion < 18) {
   process.exit(1);
 }
 
-import React from 'react';
-import { render } from 'ink';
+import React, { useState } from 'react';
+import { Box, render } from 'ink';
 import { App } from './ui/App.js';
+import { Banner } from './ui/components/Banner.js';
 
-render(<App />);
+const isTTY = Boolean(process.stdout.isTTY);
+
+function Root() {
+  const [bannerDone, setBannerDone] = useState(false);
+
+  return (
+    <Box flexDirection="column" width="100%">
+      {isTTY && <Banner onDone={() => setBannerDone(true)} />}
+      {(!isTTY || bannerDone) && <App />}
+    </Box>
+  );
+}
+
+render(<Root />);
