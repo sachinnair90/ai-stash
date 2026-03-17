@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-03-16T00:00:00.000Z",
+  "generatedAt": "2026-03-17T00:00:00.000Z",
   "skills": [
     {
       "name": "git-commit",
@@ -19,6 +19,15 @@
       "targets": ["copilot", "claude-code"],
       "files": ["skills/conventional-commit/SKILL.md"],
       "manifestUrl": "skills/conventional-commit/SKILL.md"
+    },
+    {
+      "name": "code-review",
+      "version": "1.0.0",
+      "description": "Tiered code review covering security, quality, and performance. Analyses staged and recent changes, applies confidence filtering, and produces a severity-graded report with an approve/warn/block verdict.",
+      "tags": ["code-review", "security", "quality", "workflow"],
+      "targets": ["claude-code"],
+      "files": ["skills/code-review/SKILL.md"],
+      "manifestUrl": "skills/code-review/SKILL.md"
     }
   ],
   "agents": [
@@ -30,6 +39,15 @@
       "targets": ["copilot", "claude-code"],
       "files": ["agents/debug-agent/agent.md"],
       "manifestUrl": "agents/debug-agent/agent.md"
+    },
+    {
+      "name": "planner",
+      "version": "1.0.0",
+      "description": "Expert planning specialist for complex features and refactoring. Creates detailed, phased implementation plans with exact file paths, risk assessments, and testing strategies.",
+      "tags": ["planning", "architecture", "workflow", "productivity"],
+      "targets": ["claude-code"],
+      "files": ["agents/planner/agent.md"],
+      "manifestUrl": "agents/planner/agent.md"
     }
   ],
   "instructions": [
@@ -50,6 +68,70 @@
       "targets": ["copilot", "claude-code"],
       "files": ["instructions/security-owasp/instruction.md"],
       "manifestUrl": "instructions/security-owasp/instruction.md"
+    },
+    {
+      "name": "secure-coding",
+      "version": "1.0.0",
+      "description": "Non-negotiable secure coding standards covering input validation, secrets management, authentication, error handling, dependency hygiene, and PII handling.",
+      "tags": ["security", "best-practices", "owasp", "standards"],
+      "targets": ["claude-code", "copilot"],
+      "files": ["instructions/secure-coding/instruction.md"],
+      "manifestUrl": "instructions/secure-coding/instruction.md"
+    }
+  ],
+  "commands": [
+    {
+      "name": "write-pr-description",
+      "version": "1.0.0",
+      "description": "Generate a structured pull request description from git diff. Produces a reviewer-friendly summary with type-of-change, test plan, and notes sections.",
+      "tags": ["git", "pull-request", "workflow", "documentation"],
+      "targets": ["claude-code"],
+      "files": ["commands/write-pr-description/command.md"],
+      "manifestUrl": "commands/write-pr-description/command.md"
+    }
+  ],
+  "hooks": [
+    {
+      "name": "post-edit-typecheck",
+      "version": "1.0.0",
+      "description": "Runs TypeScript type-checking asynchronously after every Edit or Write on a .ts/.tsx file. Surfaces type errors in the Claude Code output without blocking the main process.",
+      "tags": ["typescript", "quality", "automation", "hooks"],
+      "targets": ["claude-code"],
+      "files": [
+        "hooks/post-edit-typecheck/hook-config.json",
+        "hooks/post-edit-typecheck/run.sh"
+      ],
+      "manifestUrl": "hooks/post-edit-typecheck/hook-config.json"
+    }
+  ],
+  "mcpServers": [
+    {
+      "name": "github",
+      "version": "1.0.0",
+      "description": "GitHub MCP server. Gives your AI assistant direct access to GitHub APIs — read issues, PRs, files, commits, and repo metadata without leaving the IDE.",
+      "tags": ["github", "issues", "pull-requests", "git", "mcp"],
+      "targets": ["claude-code", "copilot"],
+      "files": [
+        "mcp-servers/github/mcp.json"
+      ],
+      "manifestUrl": "mcp-servers/github/mcp.json"
+    }
+  ],
+  "plugins": [
+    {
+      "name": "dev-workflow",
+      "version": "1.0.0",
+      "description": "End-to-end development workflow plugin. Bundles a planning agent (opus), conventional commit skill, and pre-push safety hook into one installable Claude Code plugin.",
+      "tags": ["workflow", "planning", "git", "commits", "hooks", "productivity"],
+      "targets": ["claude-code", "copilot"],
+      "files": [
+        "plugins/dev-workflow/.claude-plugin/plugin.json",
+        "plugins/dev-workflow/agents/planner.md",
+        "plugins/dev-workflow/skills/commit/SKILL.md",
+        "plugins/dev-workflow/hooks/hooks.json",
+        "plugins/dev-workflow/hooks/pre-push-reminder.sh"
+      ],
+      "manifestUrl": "plugins/dev-workflow/.claude-plugin/plugin.json"
     }
   ]
 }

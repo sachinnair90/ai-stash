@@ -1,0 +1,12 @@
+{
+  "hooks": [
+    {
+      "name": "post-edit-typecheck",
+      "event": "PostToolUse",
+      "matcher": "Edit|Write",
+      "command": "./hooks/post-edit-typecheck/run.sh",
+      "timeout": 15000,
+      "async": true
+    }
+  ]
+}

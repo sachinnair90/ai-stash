@@ -1,0 +1,11 @@
+{
+  "name": "dev-workflow",
+  "version": "1.0.0",
+  "description": "End-to-end development workflow plugin. Bundles a planning agent, conventional commit skill, and pre-push safety hook into one installable package.",
+  "author": {
+    "name": "DevOnGlobal",
+    "email": "engineering@devonglobal.com"
+  },
+  "repository": "https://github.com/DevOnGlobal/devon-ai-sdlc-registry",
+  "keywords": ["workflow", "planning", "git", "commits", "hooks"]
+}
