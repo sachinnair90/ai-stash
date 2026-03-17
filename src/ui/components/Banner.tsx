@@ -1,5 +1,3 @@
-import React, { useState, useEffect } from 'react';
-import { Box, Text } from 'ink';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
@@ -19,50 +17,38 @@ const LOGO = [
   '▒▒▒▒▒   ▒▒▒▒▒ ▒▒▒▒▒             ▒▒▒▒▒▒▒▒▒     ▒▒▒▒▒    ▒▒▒▒▒   ▒▒▒▒▒  ▒▒▒▒▒▒▒▒▒  ▒▒▒▒▒   ▒▒▒▒▒',
 ];
 
+const CYAN_BOLD = '\x1b[1;36m';
+const DIM      = '\x1b[2m';
+const RESET    = '\x1b[0m';
+const CYAN     = '\x1b[36m';
 const TYPING_DURATION_MS = 800;
+const HOLD_DURATION_MS   = 500;
 
-interface BannerProps {
-  onDone: () => void;
-}
+export async function printBanner(): Promise<void> {
+  const out = process.stdout;
 
-export function Banner({ onDone }: BannerProps) {
-  const [charCount, setCharCount] = useState(0);
+  out.write('\n');
+  for (const line of LOGO) {
+    out.write(CYAN_BOLD + line + RESET + '\n');
+  }
+  out.write(DIM + 'v' + VERSION + RESET + '\n');
 
+  // Typewriter animation for description
   const intervalMs = Math.max(16, Math.floor(TYPING_DURATION_MS / DESCRIPTION.length));
-
-  useEffect(() => {
-    if (charCount >= DESCRIPTION.length) {
-      onDone();
-      return;
-    }
-
-    const interval = setInterval(() => {
-      setCharCount(prev => Math.min(prev + 1, DESCRIPTION.length));
+  await new Promise<void>(resolve => {
+    let charCount = 0;
+    const tick = setInterval(() => {
+      charCount++;
+      const text = DESCRIPTION.slice(0, charCount);
+      const cursor = charCount < DESCRIPTION.length ? CYAN + '▌' + RESET : '  ';
+      out.write('\r' + text + cursor);
+      if (charCount >= DESCRIPTION.length) {
+        clearInterval(tick);
+        setTimeout(() => {
+          out.write('\n\n');
+          resolve();
+        }, HOLD_DURATION_MS);
+      }
     }, intervalMs);
-
-    return () => clearInterval(interval);
-  }, [charCount, onDone, intervalMs]);
-
-  const visibleText = DESCRIPTION.slice(0, charCount);
-  const cursor = charCount < DESCRIPTION.length ? '▌' : '';
-
-  return (
-    <Box
-      flexDirection="column"
-      alignItems="center"
-      paddingY={1}
-    >
-      <Box flexDirection="column" alignItems="flex-start">
-        {LOGO.map((line, i) => (
-          <Text key={i} color="cyan" bold>{line}</Text>
-        ))}
-      </Box>
-      <Box marginTop={1}>
-        <Text dimColor>v{VERSION}</Text>
-      </Box>
-      <Box marginTop={1}>
-        <Text>{visibleText}<Text color="cyan">{cursor}</Text></Text>
-      </Box>
-    </Box>
-  );
+  });
 }

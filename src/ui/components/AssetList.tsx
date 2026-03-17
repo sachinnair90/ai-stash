@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, useStdout } from 'ink';
 import type { RegistryAsset } from '../../registry/types.js';
 import type { Lockfile } from '../../lockfile/types.js';
 import { isInstalled, isUpdateAvailable } from '../../lockfile/index.js';
@@ -23,6 +23,9 @@ interface AssetListProps {
   onToggle: (name: string) => void;
 }
 
+// Lines consumed by header, search bar, footer, and borders
+const CHROME_LINES = 8;
+
 export function AssetList({
   assets,
   selectedIndex,
@@ -31,6 +34,10 @@ export function AssetList({
   onSelect,
   onToggle,
 }: AssetListProps) {
+  const { stdout } = useStdout();
+  const terminalRows = stdout.rows ?? 24;
+  const maxVisible = Math.max(3, terminalRows - CHROME_LINES);
+
   if (assets.length === 0) {
     return (
       <Box padding={1}>
@@ -39,9 +46,17 @@ export function AssetList({
     );
   }
 
+  // Keep selected item in the visible window
+  const windowStart = Math.max(
+    0,
+    Math.min(selectedIndex - Math.floor(maxVisible / 2), assets.length - maxVisible),
+  );
+  const visibleAssets = assets.slice(windowStart, windowStart + maxVisible);
+
   return (
     <Box flexDirection="column">
-      {assets.map((asset, index) => {
+      {visibleAssets.map((asset, i) => {
+        const index = windowStart + i;
         const isSelected = index === selectedIndex;
         const isMultiSelected = selectedItems.has(asset.name);
         const installed = isInstalled(lockfile, asset.name);
@@ -69,7 +84,7 @@ export function AssetList({
           : asset.description;
 
         return (
-          <Box key={asset.name}>
+          <Box key={`${asset.type}-${asset.name}`}>
             <Text inverse={isSelected}>
               <Text>{checkbox}</Text>
               <Text color={statusColor}>{statusIcon}</Text>
@@ -80,7 +95,7 @@ export function AssetList({
             </Text>
           </Box>
         );
-      })}
+        })}
     </Box>
   );
 }

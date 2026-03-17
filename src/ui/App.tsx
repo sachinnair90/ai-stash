@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Box, Text, useApp, useInput } from 'ink';
+import { Box, Text, useApp, useInput, useStdout } from 'ink';
 import Spinner from 'ink-spinner';
 import { Footer } from './components/Footer.js';
 import { HelpOverlay } from './components/HelpOverlay.js';
@@ -27,7 +27,12 @@ const viewLabels: Record<ViewName, string> = {
   installed: 'Installed',
 };
 
+// header (2) + search (1) + footer (1)
+const CHROME_ROWS = 4;
+
 export function App() {
+  const { stdout } = useStdout();
+  const browseHeight = Math.max(5, (stdout.rows ?? 24) - CHROME_ROWS);
   const { exit } = useApp();
 
   // Data loading
