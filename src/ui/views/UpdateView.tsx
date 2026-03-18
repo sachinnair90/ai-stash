@@ -28,7 +28,7 @@ export function UpdateView({ assets, lockfile, registryBaseUrl, projectRoot, onD
     const result = await updateAsset(asset, lockfile, projectRoot, registryBaseUrl, githubToken);
     setResults((prev) => [...prev, result]);
     setUpdating(false);
-  }, [lockfile, updatable, selectedIndex, registryBaseUrl]);
+  }, [lockfile, updatable, selectedIndex, registryBaseUrl, projectRoot, githubToken]);
 
   const handleUpdateAll = useCallback(async () => {
     if (!lockfile || updatable.length === 0) return;
@@ -36,15 +36,15 @@ export function UpdateView({ assets, lockfile, registryBaseUrl, projectRoot, onD
     const allResults = await updateAll(updatable, lockfile, projectRoot, registryBaseUrl, githubToken);
     setResults(allResults);
     setUpdating(false);
-  }, [lockfile, updatable, registryBaseUrl]);
+  }, [lockfile, updatable, registryBaseUrl, projectRoot, githubToken]);
 
   useInput((input, key) => {
     if (key.escape) {
       onDone();
       return;
     }
-    if (key.upArrow) setSelectedIndex((i) => Math.max(0, i - 1));
-    if (key.downArrow) setSelectedIndex((i) => Math.min(updatable.length - 1, i + 1));
+    if (key.upArrow && updatable.length > 0) setSelectedIndex((i) => Math.max(0, i - 1));
+    if (key.downArrow && updatable.length > 0) setSelectedIndex((i) => Math.min(updatable.length - 1, i + 1));
     if (input === 'u' && !updating) void handleUpdateOne();
     if (input === 'U' && !updating) void handleUpdateAll();
   });

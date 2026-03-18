@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, useInput } from 'ink';
 
 interface ShortcutGroup {
   title: string;
@@ -41,6 +41,10 @@ interface HelpOverlayProps {
 }
 
 export function HelpOverlay({ onClose }: HelpOverlayProps) {
+  useInput((input, key) => {
+    if (input === '?' || key.escape) onClose();
+  });
+
   return (
     <Box flexDirection="column" padding={1}>
       <Box marginBottom={1}>

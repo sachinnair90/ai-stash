@@ -33,7 +33,13 @@ export function loadConfig(): Config {
   let config: Config;
   if (fs.existsSync(configPath)) {
     const raw = fs.readFileSync(configPath, 'utf-8');
-    const parsed = JSON.parse(raw) as Partial<Config>;
+    let parsed: Partial<Config>;
+    try {
+      parsed = JSON.parse(raw) as Partial<Config>;
+    } catch {
+      console.warn('ai-stash: config.json is invalid JSON, falling back to defaults');
+      parsed = {};
+    }
     config = { ...DEFAULT_CONFIG, ...parsed };
   } else {
     // Create config directory and default config file

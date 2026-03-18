@@ -12,10 +12,10 @@ export function InstalledView({ lockfile, onRemove }: InstalledViewProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
 
   useInput((input, key) => {
-    if (key.upArrow) {
+    if (key.upArrow && entries.length > 0) {
       setSelectedIndex((i) => Math.max(0, i - 1));
     }
-    if (key.downArrow) {
+    if (key.downArrow && entries.length > 0) {
       setSelectedIndex((i) => Math.min(entries.length - 1, i + 1));
     }
     if (input === 'r' && entries.length > 0) {

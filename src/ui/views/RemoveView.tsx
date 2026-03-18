@@ -22,7 +22,7 @@ export function RemoveView({ assetName, lockfile, projectRoot, onDone, onCancel 
     await removeAsset(assetName, lockfile, projectRoot);
     setRemoving(false);
     setDone(true);
-  }, [assetName, lockfile]);
+  }, [assetName, lockfile, projectRoot]);
 
   useInput((input, key) => {
     if (done) {
@@ -30,6 +30,7 @@ export function RemoveView({ assetName, lockfile, projectRoot, onDone, onCancel 
       return;
     }
     if (removing) return;
+    if (!asset) return;
     if (input === 'y' || input === 'Y') void handleRemove();
     if (input === 'n' || input === 'N' || key.escape) onCancel();
   });

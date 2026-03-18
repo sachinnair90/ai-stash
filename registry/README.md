@@ -6,13 +6,28 @@ This directory contains a sample registry for `ai-stash` with artifacts sourced 
 
 ```
 registry/
-├── registry.json           # Registry index — consumed by ai-stash
-└── assets/
-    ├── git-commit/         # Skill: conventional git commits (Claude Code)
-    ├── conventional-commit/ # Skill: XML-structured commit messages (both)
-    ├── debug-agent/        # Agent: systematic four-phase debugger (both)
-    ├── code-review/        # Instruction: generic code review guidelines (both)
-    └── security-owasp/     # Instruction: OWASP Top 10 secure coding rules (both)
+├── registry.json                   # Registry index — consumed by ai-stash
+├── skills/
+│   ├── git-commit/                 # Skill: conventional git commits (Claude Code)
+│   ├── conventional-commit/        # Skill: XML-structured commit messages (both)
+│   ├── code-review/                # Skill: tiered code review (both)
+│   ├── add-asset/                  # Skill: add assets to the registry (both)
+│   └── create-adapter/             # Skill: scaffold a new adapter (both)
+├── agents/
+│   ├── debug-agent/                # Agent: systematic four-phase debugger (both)
+│   └── planner/                    # Agent: structured planning assistant (both)
+├── instructions/
+│   ├── code-review/                # Instruction: generic code review guidelines (both)
+│   ├── secure-coding/              # Instruction: secure coding standards (both)
+│   └── security-owasp/            # Instruction: OWASP Top 10 secure coding rules (both)
+├── hooks/
+│   └── post-edit-typecheck/        # Hook: typecheck after file edits (Claude Code)
+├── commands/
+│   └── write-pr-description/       # Command: generate PR descriptions (both)
+├── mcp-servers/
+│   └── github/                     # MCP server: GitHub integration config
+└── plugins/
+    └── dev-workflow/               # Plugin: bundled dev workflow assets
 ```
 
 ## Assets
@@ -49,4 +64,4 @@ npx ai-stash
 
 ## File path note
 
-Asset `files` paths are relative to `registry.json`. The engine resolves fetch URLs via `new URL(filePath, registryUrl)`, so files at `assets/git-commit/SKILL.md` are served at the correct path when the registry is hosted. Only the basename is used for the local install destination, so `SKILL.md` installs to `.claude/skills/git-commit/SKILL.md` regardless of its registry subdirectory path.
+Asset `files` paths are relative to the registry root. The engine resolves fetch URLs via `new URL(filePath, registryUrl)`, so files at `skills/git-commit/SKILL.md` are served at the correct path when the registry is hosted. For standard assets (skills, agents, instructions, commands, hooks), the basename is used for the install destination — `SKILL.md` installs to `.claude/skills/git-commit/SKILL.md`. For plugin assets, subpaths under `plugins/{name}/` are preserved at the install destination.

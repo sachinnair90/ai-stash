@@ -43,7 +43,7 @@ export function PreviewPane({ asset, registryBaseUrl, githubToken }: PreviewPane
     return () => {
       cancelled = true;
     };
-  }, [asset, registryBaseUrl]);
+  }, [asset, registryBaseUrl, githubToken]);
 
   useInput((input, key) => {
     if (key.pageDown) {

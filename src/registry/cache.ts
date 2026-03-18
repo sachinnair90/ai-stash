@@ -25,7 +25,13 @@ export function readCache(ttl: number): CacheResult | null {
   }
 
   const raw = fs.readFileSync(cachePath, 'utf-8');
-  const entry = JSON.parse(raw) as CacheEntry;
+  let entry: CacheEntry;
+  try {
+    entry = JSON.parse(raw) as CacheEntry;
+  } catch {
+    // Corrupted cache — treat as miss
+    return null;
+  }
   const cacheAge = Date.now() - entry.fetchedAt;
 
   return {

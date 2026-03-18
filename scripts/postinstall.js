@@ -85,7 +85,7 @@ for (const { label, dest } of targets) {
     installed++;
   } catch (err) {
     // Non-fatal — the user can still use the TUI manually.
-    console.warn(`ai-stash: could not install add-asset skill for ${label}: ${err.message}`);
+    console.warn(`ai-stash: could not install add-asset skill for ${label}: ${err instanceof Error ? err.message : String(err)}`);
   }
 }
 

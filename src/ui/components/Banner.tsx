@@ -34,6 +34,11 @@ export async function printBanner(): Promise<void> {
   out.write(DIM + 'v' + VERSION + RESET + '\n');
 
   // Typewriter animation for description
+  if (DESCRIPTION.length === 0) {
+    await new Promise<void>(resolve => setTimeout(resolve, HOLD_DURATION_MS));
+    out.write('\n\n');
+    return;
+  }
   const intervalMs = Math.max(16, Math.floor(TYPING_DURATION_MS / DESCRIPTION.length));
   await new Promise<void>(resolve => {
     let charCount = 0;

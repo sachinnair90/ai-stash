@@ -14,7 +14,7 @@ The system SHALL fetch `registry.json` from the configured registry URL (GitHub 
 - **THEN** the system displays an error message explaining that the registry is unreachable and no cached data is available
 
 ### Requirement: Cache registry locally
-The system SHALL cache the fetched `registry.json` at `~/.config/ai-stash/cache/registry.json` with a configurable TTL (default: 3600 seconds).
+The system SHALL cache the fetched `registry.json` at `${XDG_CACHE_HOME:-~/.cache}/ai-stash/registry.json` with a configurable TTL (default: 3600 seconds).
 
 #### Scenario: Cache is fresh
 - **WHEN** the TUI starts and the cached `registry.json` is younger than the configured TTL
