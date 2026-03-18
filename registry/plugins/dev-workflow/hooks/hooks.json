@@ -1,0 +1,12 @@
+{
+  "hooks": [
+    {
+      "name": "pre-push-reminder",
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "command": "./hooks/pre-push-reminder.sh",
+      "timeout": 5000,
+      "async": false
+    }
+  ]
+}
