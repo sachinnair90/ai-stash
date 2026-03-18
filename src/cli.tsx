@@ -4,10 +4,10 @@ if (nodeVersion < 18) {
   process.exit(1);
 }
 
-import React from 'react';
-import { render } from 'ink';
-import { App } from './ui/App.js';
-import { printBanner } from './ui/components/Banner.js';
+// Dynamic imports ensure the version check above runs before any module code executes
+const { render } = await import('ink');
+const { App } = await import('./ui/App.js');
+const { printBanner } = await import('./ui/components/Banner.js');
 
 if (process.stdout.isTTY) {
   await printBanner();

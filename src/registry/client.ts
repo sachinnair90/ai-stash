@@ -10,20 +10,21 @@ export interface RegistryResult {
 }
 
 export async function getRegistry(config: Config): Promise<RegistryResult> {
-  // Try fetching fresh data
+  // Use cache when it's still fresh
+  const cached = readCache(config.cacheTTL);
+  if (cached && !cached.stale) {
+    return { registry: cached.data, stale: false, cacheAge: cached.cacheAge };
+  }
+
+  // Cache missing or expired — fetch fresh data
   try {
     const registry = await fetchRegistry(config.registry.url, config.githubToken);
     writeCache(registry);
     return { registry, stale: false, cacheAge: 0 };
   } catch {
-    // Network failure — fall back to cache
-    const cached = readCache(config.cacheTTL);
+    // Network failure — fall back to stale cache if available
     if (cached) {
-      return {
-        registry: cached.data,
-        stale: true,
-        cacheAge: cached.cacheAge,
-      };
+      return { registry: cached.data, stale: true, cacheAge: cached.cacheAge };
     }
     throw new Error('Failed to fetch registry and no cached data available');
   }

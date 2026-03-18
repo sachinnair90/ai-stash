@@ -43,7 +43,10 @@ export function loadConfig(): Config {
     config = {
       ...DEFAULT_CONFIG,
       ...parsed,
-      registry: { ...DEFAULT_CONFIG.registry, ...parsed.registry },
+      registry: {
+        ...DEFAULT_CONFIG.registry,
+        ...(parsed.registry && typeof parsed.registry === 'object' ? parsed.registry : {}),
+      },
     };
   } else {
     // Create config directory and default config file

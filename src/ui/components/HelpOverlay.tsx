@@ -13,7 +13,6 @@ const groups: ShortcutGroup[] = [
       { key: '↑↓', description: 'Navigate list' },
       { key: 'Enter', description: 'Select item' },
       { key: 'Space', description: 'Multi-select' },
-      { key: 'Tab', description: 'Switch panes' },
     ],
   },
   {

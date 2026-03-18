@@ -10,7 +10,13 @@ export function readLockfile(projectRoot: string): Lockfile | null {
   }
 
   const raw = fs.readFileSync(lockfilePath, 'utf-8');
-  const lockfile = JSON.parse(raw) as Lockfile;
+  let lockfile: Lockfile;
+  try {
+    lockfile = JSON.parse(raw) as Lockfile;
+  } catch {
+    console.warn('ai-stash: lockfile is corrupted or invalid JSON, ignoring');
+    return null;
+  }
 
   // Migrate legacy 'prompt' type to 'command'
   for (const asset of Object.values(lockfile.installed)) {

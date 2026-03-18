@@ -11,7 +11,7 @@ const typeColors: Record<string, string> = {
   hook: 'red',
   command: 'magenta',
   plugin: 'cyan',
-  'mcp-server': 'yellowBright',
+  'mcp-server': '#FFA500',
 };
 
 interface AssetListProps {
