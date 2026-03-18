@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
 import Spinner from 'ink-spinner';
 import type { RegistryAsset } from '../../registry/types.js';
@@ -19,6 +19,13 @@ export function UpdateView({ assets, lockfile, registryBaseUrl, projectRoot, onD
   const updatable = assets.filter((a) => isUpdateAvailable(lockfile, a.name, a.version));
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [updating, setUpdating] = useState(false);
+
+  // Clamp selectedIndex when updatable shrinks (e.g. after a successful update)
+  useEffect(() => {
+    if (updatable.length > 0) {
+      setSelectedIndex((i) => Math.min(updatable.length - 1, Math.max(0, i)));
+    }
+  }, [updatable.length]);
   const [results, setResults] = useState<UpdateResult[]>([]);
 
   const handleUpdateOne = useCallback(async () => {

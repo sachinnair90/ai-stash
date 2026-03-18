@@ -19,8 +19,6 @@ interface AssetListProps {
   selectedIndex: number;
   selectedItems: Set<string>;
   lockfile: Lockfile | null;
-  onSelect: (index: number) => void;
-  onToggle: (name: string) => void;
 }
 
 // Lines consumed by header, search bar, footer, and borders
@@ -31,8 +29,6 @@ export function AssetList({
   selectedIndex,
   selectedItems,
   lockfile,
-  onSelect,
-  onToggle,
 }: AssetListProps) {
   const { stdout } = useStdout();
   const terminalRows = stdout.rows ?? 24;

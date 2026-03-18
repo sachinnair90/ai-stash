@@ -16,29 +16,47 @@ export function RemoveView({ assetName, lockfile, projectRoot, onDone, onCancel 
   const asset = lockfile.installed[assetName];
   const [removing, setRemoving] = useState(false);
   const [done, setDone] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleRemove = useCallback(async () => {
     setRemoving(true);
-    await removeAsset(assetName, lockfile, projectRoot);
+    const result = await removeAsset(assetName, lockfile, projectRoot);
     setRemoving(false);
-    setDone(true);
+    if (result.success) {
+      setDone(true);
+    } else {
+      setError(`Failed to remove "${assetName}". Check that the files are writable.`);
+    }
   }, [assetName, lockfile, projectRoot]);
 
   useInput((input, key) => {
-    if (done) {
+    if (done || error) {
       onDone();
+      return;
+    }
+    if (key.escape || input === 'n' || input === 'N') {
+      onCancel();
       return;
     }
     if (removing) return;
     if (!asset) return;
     if (input === 'y' || input === 'Y') void handleRemove();
-    if (input === 'n' || input === 'N' || key.escape) onCancel();
   });
 
   if (!asset) {
     return (
-      <Box padding={1}>
+      <Box padding={1} flexDirection="column">
         <Text color="red">Asset &quot;{assetName}&quot; not found in lockfile.</Text>
+        <Box marginTop={1}><Text dimColor>Escape or n to go back</Text></Box>
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box padding={1} flexDirection="column">
+        <Text color="red">{error}</Text>
+        <Box marginTop={1}><Text dimColor>Press any key to go back</Text></Box>
       </Box>
     );
   }

@@ -45,12 +45,14 @@ export function PreviewPane({ asset, registryBaseUrl, githubToken }: PreviewPane
     };
   }, [asset, registryBaseUrl, githubToken]);
 
+  const PAGE_SIZE = 20;
+
   useInput((input, key) => {
     if (key.pageDown) {
-      setScrollOffset((prev) => prev + 10);
+      setScrollOffset((prev) => prev + PAGE_SIZE);
     }
     if (key.pageUp) {
-      setScrollOffset((prev) => Math.max(0, prev - 10));
+      setScrollOffset((prev) => Math.max(0, prev - PAGE_SIZE));
     }
   });
 
@@ -93,16 +95,17 @@ export function PreviewPane({ asset, registryBaseUrl, githubToken }: PreviewPane
   }
 
   const allLines = lines.join('\n').split('\n');
-  const visible = allLines.slice(scrollOffset, scrollOffset + 20);
+  const clampedOffset = Math.min(scrollOffset, Math.max(0, allLines.length - PAGE_SIZE));
+  const visible = allLines.slice(clampedOffset, clampedOffset + PAGE_SIZE);
 
   return (
     <Box flexDirection="column" padding={1}>
       {visible.map((line, i) => (
-        <Text key={scrollOffset + i}>{line}</Text>
+        <Text key={clampedOffset + i}>{line}</Text>
       ))}
-      {allLines.length > 20 && (
+      {allLines.length > PAGE_SIZE && (
         <Text dimColor>
-          [{scrollOffset + 1}-{Math.min(scrollOffset + 20, allLines.length)} of {allLines.length}] PageUp/PageDown to scroll
+          [{clampedOffset + 1}-{Math.min(clampedOffset + PAGE_SIZE, allLines.length)} of {allLines.length}] PageUp/PageDown to scroll
         </Text>
       )}
     </Box>

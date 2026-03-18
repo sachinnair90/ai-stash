@@ -271,8 +271,6 @@ export function App() {
             selectedIndex={selectedIndex}
             selectedItems={selectedItems}
             lockfile={lockfile}
-            onSelect={setSelectedIndex}
-            onToggle={toggleSelect}
           />
         </Box>
         <Box

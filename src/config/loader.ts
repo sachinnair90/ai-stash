@@ -40,7 +40,11 @@ export function loadConfig(): Config {
       console.warn('ai-stash: config.json is invalid JSON, falling back to defaults');
       parsed = {};
     }
-    config = { ...DEFAULT_CONFIG, ...parsed };
+    config = {
+      ...DEFAULT_CONFIG,
+      ...parsed,
+      registry: { ...DEFAULT_CONFIG.registry, ...parsed.registry },
+    };
   } else {
     // Create config directory and default config file
     fs.mkdirSync(configDir, { recursive: true });
@@ -52,7 +56,7 @@ export function loadConfig(): Config {
     config.registry = { ...config.registry, url: process.env['REGISTRY_URL'] };
   }
 
-  config.githubToken = resolveGithubToken();
+  config.githubToken = config.githubToken ?? resolveGithubToken();
 
   return config;
 }
