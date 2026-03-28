@@ -4,7 +4,24 @@ import type { Lockfile } from '../../lockfile/types.js';
 
 interface InstalledViewProps {
   lockfile: Lockfile | null;
-  onRemove: (assetName: string) => void;
+  onRemove: (lockfileKey: string) => void;
+}
+
+function isOrphaned(lockfileKey: string, lockfile: Lockfile): boolean {
+  const parts = lockfileKey.split(':');
+  if (parts.length < 3) return false;
+  const registryName = parts[0];
+  return !lockfile.registries.some((r) => r.name === registryName);
+}
+
+function displayName(lockfileKey: string): string {
+  const parts = lockfileKey.split(':');
+  if (parts.length >= 3) return parts.slice(2).join(':');
+  return lockfileKey;
+}
+
+function registryNameFrom(lockfileKey: string): string {
+  return lockfileKey.split(':')[0] ?? lockfileKey;
 }
 
 export function InstalledView({ lockfile, onRemove }: InstalledViewProps) {
@@ -19,8 +36,8 @@ export function InstalledView({ lockfile, onRemove }: InstalledViewProps) {
       setSelectedIndex((i) => Math.min(entries.length - 1, i + 1));
     }
     if (input === 'r' && entries.length > 0) {
-      const [name] = entries[selectedIndex];
-      onRemove(name);
+      const [lockfileKey] = entries[selectedIndex];
+      onRemove(lockfileKey);
     }
   });
 
@@ -36,16 +53,23 @@ export function InstalledView({ lockfile, onRemove }: InstalledViewProps) {
     <Box flexDirection="column" padding={1}>
       <Text bold>Installed Assets</Text>
       <Box marginTop={1} flexDirection="column">
-        {entries.map(([name, asset], index) => (
-          <Box key={name}>
-            <Text inverse={index === selectedIndex}>
-              <Text> {name} </Text>
-              <Text dimColor>v{asset.version} </Text>
-              <Text color="cyan">{asset.scope} </Text>
-              <Text dimColor>{asset.targets.join(', ')}</Text>
-            </Text>
-          </Box>
-        ))}
+        {entries.map(([lockfileKey, asset], index) => {
+          const orphaned = lockfile ? isOrphaned(lockfileKey, lockfile) : false;
+          const regName = registryNameFrom(lockfileKey);
+          const name = displayName(lockfileKey);
+          return (
+            <Box key={lockfileKey}>
+              <Text inverse={index === selectedIndex}>
+                {orphaned && <Text color="yellow">⚠ </Text>}
+                <Text> {name} </Text>
+                <Text dimColor>v{asset.version} </Text>
+                <Text color="cyan">{asset.scope} </Text>
+                <Text dimColor>{asset.targets.join(', ')}</Text>
+                {orphaned && <Text color="yellow"> — registry '{regName}' not configured</Text>}
+              </Text>
+            </Box>
+          );
+        })}
       </Box>
       <Box marginTop={1}><Text dimColor>↑↓ navigate, r remove</Text></Box>
     </Box>

@@ -2,8 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { RegistryAsset } from '../registry/types.js';
 import { getUnsyncedAssets } from '../lockfile/index.js';
-import type { Lockfile, InstalledAsset } from '../lockfile/types.js';
-import type { Config } from '../config/types.js';
+import type { Lockfile, InstalledAsset, RegistryConfig } from '../lockfile/types.js';
 import type { AssetType } from '../adapters/types.js';
 import { getAdapter } from '../adapters/index.js';
 import { fetchAssetFile } from '../registry/fetcher.js';
@@ -21,6 +20,7 @@ export interface InstallOptions {
   targets: string[];
   projectRoot: string;
   registryBaseUrl: string;
+  registryName: string;
   githubToken?: string;
 }
 
@@ -33,6 +33,55 @@ export interface InstallFileResult {
   asset: string;
   files: InstallFileStatus[];
   success: boolean;
+  suffixApplied?: { originalName: string; suffixedName: string; conflictingRegistry: string };
+}
+
+/**
+ * Detect cross-registry conflict and resolve the asset name/key.
+ * Returns the (possibly suffixed) asset to install and the lockfile key.
+ */
+export function resolveForInstall(
+  asset: RegistryAsset,
+  registryName: string,
+  registryUrl: string,
+  lockfile: Lockfile | null,
+): {
+  resolvedAsset: RegistryAsset;
+  lockfileKey: string;
+  suffixApplied: boolean;
+  conflictingRegistry: string | null;
+} {
+  const lockfileKey = `${registryName}:${asset.type}:${asset.name}`;
+
+  if (!lockfile) {
+    return { resolvedAsset: asset, lockfileKey, suffixApplied: false, conflictingRegistry: null };
+  }
+
+  // Check if same type+name exists from a DIFFERENT registry URL
+  for (const [key, installed] of Object.entries(lockfile.installed)) {
+    const parts = key.split(':');
+    if (parts.length < 3) continue;
+    const [existingRegistry, existingType, ...nameParts] = parts;
+    const existingName = nameParts.join(':');
+    if (
+      existingType === asset.type &&
+      existingName === asset.name &&
+      existingRegistry !== registryName &&
+      installed.registryUrl !== registryUrl
+    ) {
+      // Conflict: same type+name from different registry
+      const suffixedName = `${asset.name}-${registryName}`;
+      const resolvedAsset: RegistryAsset = { ...asset, name: suffixedName };
+      return {
+        resolvedAsset,
+        lockfileKey,
+        suffixApplied: true,
+        conflictingRegistry: existingRegistry,
+      };
+    }
+  }
+
+  return { resolvedAsset: asset, lockfileKey, suffixApplied: false, conflictingRegistry: null };
 }
 
 /**
@@ -68,9 +117,15 @@ export async function planInstall(
     }
   }
 
-  // Detect conflicts
+  // Detect conflicts — check against lockfile key for managed detection
   const conflicts: FileConflict[] = [];
-  const installedEntry = lockfile?.installed[asset.name];
+  // Find entry by matching asset name in lockfile keys (last segment)
+  const installedEntry = lockfile
+    ? Object.entries(lockfile.installed).find(([key]) => {
+        const parts = key.split(':');
+        return parts[parts.length - 1] === asset.name;
+      })?.[1]
+    : undefined;
 
   for (const filePath of Object.keys(transformedFiles)) {
     const relativePath = path.relative(projectRoot, filePath);
@@ -97,6 +152,8 @@ export async function executeInstall(
   resolutions: Record<string, ConflictResolution>,
   projectRoot: string,
   lockfile: Lockfile,
+  lockfileKey?: string,
+  registryUrl?: string,
 ): Promise<InstallResult> {
   const installedFiles: string[] = [];
   const skippedFiles: string[] = [];
@@ -146,9 +203,11 @@ export async function executeInstall(
     targets: plan.targets,
     scope: plan.scope,
     files: installedFiles,
+    registryUrl: registryUrl ?? '',
   };
 
-  lockfile.installed[plan.asset.name] = lockfileEntry;
+  const key = lockfileKey ?? plan.asset.name;
+  lockfile.installed[key] = lockfileEntry;
   writeLockfile(projectRoot, lockfile);
 
   return {
@@ -169,17 +228,27 @@ export async function installAssetFull(
   targets: string[],
   scope: 'project' | 'global',
   projectRoot: string,
-  config: Config,
+  registryUrl: string,
   lockfile: Lockfile,
+  registryName: string,
+  githubToken?: string,
   onProgress?: (conflicts: FileConflict[]) => Promise<Record<string, ConflictResolution>>,
 ): Promise<InstallResult> {
-  const plan = await planInstall(
+  const { resolvedAsset, lockfileKey } = resolveForInstall(
     asset,
+    registryName,
+    registryUrl,
+    lockfile,
+  );
+
+  const plan = await planInstall(
+    resolvedAsset,
     targets,
     scope,
     projectRoot,
     lockfile,
-    config.registry.url,
+    registryUrl,
+    githubToken,
   );
 
   // Build resolutions
@@ -203,7 +272,7 @@ export async function installAssetFull(
     }
   }
 
-  return executeInstall(plan, resolutions, projectRoot, lockfile);
+  return executeInstall(plan, resolutions, projectRoot, lockfile, lockfileKey, registryUrl);
 }
 
 /**
@@ -214,8 +283,9 @@ export async function dryRunInstall(
   targets: string[],
   scope: 'project' | 'global',
   projectRoot: string,
-  config: Config,
+  registryUrl: string,
   lockfile: Lockfile | null,
+  githubToken?: string,
 ): Promise<InstallPlan> {
   return planInstall(
     asset,
@@ -223,7 +293,8 @@ export async function dryRunInstall(
     scope,
     projectRoot,
     lockfile,
-    config.registry.url,
+    registryUrl,
+    githubToken,
   );
 }
 
@@ -236,7 +307,7 @@ export async function installAsset(
   options: InstallOptions,
   onProgress?: (status: InstallFileStatus) => void,
 ): Promise<InstallFileResult> {
-  const { scope, targets, projectRoot, registryBaseUrl, githubToken } = options;
+  const { scope, targets, projectRoot, registryBaseUrl, registryName, githubToken } = options;
 
   // Build or load lockfile
   let lockfile: Lockfile;
@@ -244,8 +315,19 @@ export async function installAsset(
   if (fs.existsSync(lockfilePath)) {
     lockfile = JSON.parse(fs.readFileSync(lockfilePath, 'utf-8')) as Lockfile;
   } else {
-    lockfile = { version: 1, registry: registryBaseUrl, installed: {} };
+    lockfile = {
+      version: 2,
+      registries: [{ name: registryName, url: registryBaseUrl }],
+      installed: {},
+    };
   }
+
+  const { resolvedAsset, lockfileKey, suffixApplied, conflictingRegistry } = resolveForInstall(
+    asset,
+    registryName,
+    registryBaseUrl,
+    lockfile,
+  );
 
   const fileStatuses: InstallFileStatus[] = asset.files.map((f) => ({
     file: f,
@@ -254,7 +336,7 @@ export async function installAsset(
 
   try {
     const plan = await planInstall(
-      asset,
+      resolvedAsset,
       targets,
       scope,
       projectRoot,
@@ -285,7 +367,7 @@ export async function installAsset(
       resolutions[conflict.filePath] = 'overwrite';
     }
 
-    const result = await executeInstall(plan, resolutions, projectRoot, lockfile);
+    const result = await executeInstall(plan, resolutions, projectRoot, lockfile, lockfileKey, registryBaseUrl);
 
     // Map to TUI-compatible result
     const resultStatuses: InstallFileStatus[] = result.installedFiles.map((f) => ({
@@ -300,6 +382,9 @@ export async function installAsset(
       asset: asset.name,
       files: resultStatuses,
       success: true,
+      suffixApplied: suffixApplied
+        ? { originalName: asset.name, suffixedName: resolvedAsset.name, conflictingRegistry: conflictingRegistry! }
+        : undefined,
     };
   } catch {
     return {
@@ -312,36 +397,55 @@ export async function installAsset(
 
 export interface SyncResult {
   installed: string[];
-  skipped: string[];  // asset names not found in registry
+  skipped: string[];  // asset names not found in registry or orphaned
   failed: string[];
+  orphaned: string[];
 }
 
 /**
  * Batch-install all lockfile entries whose files are missing on disk.
  * Scope and targets are read from the lockfile entry — no user prompting.
+ * Orphaned assets (registry name not in registries[]) are skipped.
  */
 export async function syncFromLockfile(
   lockfile: Lockfile,
   registryAssets: RegistryAsset[],
   projectRoot: string,
-  registryBaseUrl: string,
-  onProgress?: (assetName: string, status: 'installing' | 'done' | 'skipped' | 'failed') => void,
+  onProgress?: (assetName: string, status: 'installing' | 'done' | 'skipped' | 'failed' | 'orphaned') => void,
   githubToken?: string,
 ): Promise<SyncResult> {
   const unsynced = getUnsyncedAssets(lockfile, projectRoot);
-  const byName = new Map(registryAssets.map((a) => [a.name, a]));
+  const configuredRegistryNames = new Set(lockfile.registries.map((r) => r.name));
 
-  const result: SyncResult = { installed: [], skipped: [], failed: [] };
+  const result: SyncResult = { installed: [], skipped: [], failed: [], orphaned: [] };
 
-  for (const { name, asset: lockfileEntry } of unsynced) {
-    const registryAsset = byName.get(name);
-    if (!registryAsset) {
-      result.skipped.push(name);
-      onProgress?.(name, 'skipped');
+  for (const { name: lockfileKey, asset: lockfileEntry } of unsynced) {
+    // Parse registry name from key
+    const parts = lockfileKey.split(':');
+    const registryName = parts[0];
+
+    // Skip orphaned assets
+    if (!configuredRegistryNames.has(registryName)) {
+      result.orphaned.push(lockfileKey);
+      onProgress?.(lockfileKey, 'orphaned');
       continue;
     }
 
-    onProgress?.(name, 'installing');
+    // Extract original asset name (last segment(s))
+    const assetName = parts.slice(2).join(':');
+
+    // Look up asset in registry by original name
+    const registryAsset = registryAssets.find(
+      (a) => a.name === assetName && a.registryName === registryName,
+    ) ?? registryAssets.find((a) => a.name === assetName);
+
+    if (!registryAsset) {
+      result.skipped.push(lockfileKey);
+      onProgress?.(lockfileKey, 'skipped');
+      continue;
+    }
+
+    onProgress?.(lockfileKey, 'installing');
     try {
       const plan = await planInstall(
         registryAsset,
@@ -349,15 +453,15 @@ export async function syncFromLockfile(
         lockfileEntry.scope as 'project' | 'global',
         projectRoot,
         lockfile,
-        registryBaseUrl,
+        lockfileEntry.registryUrl,
         githubToken,
       );
-      await executeInstall(plan, {}, projectRoot, lockfile);
-      result.installed.push(name);
-      onProgress?.(name, 'done');
+      await executeInstall(plan, {}, projectRoot, lockfile, lockfileKey, lockfileEntry.registryUrl);
+      result.installed.push(lockfileKey);
+      onProgress?.(lockfileKey, 'done');
     } catch {
-      result.failed.push(name);
-      onProgress?.(name, 'failed');
+      result.failed.push(lockfileKey);
+      onProgress?.(lockfileKey, 'failed');
     }
   }
 

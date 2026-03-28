@@ -1,43 +1,4 @@
-### Requirement: Detect unsynced assets
-The system SHALL compare the lockfile's installed entries against the local filesystem and identify assets whose files are not present on disk. Orphaned assets (registry name not in `registries[]`) SHALL be excluded from the unsynced count and handled separately.
-
-#### Scenario: All assets present
-- **WHEN** every file listed in each lockfile entry exists on disk
-- **THEN** the system reports zero unsynced assets
-
-#### Scenario: Some assets missing
-- **WHEN** one or more non-orphaned lockfile entries have a missing first file on disk
-- **THEN** the system identifies those entries as unsynced
-
-#### Scenario: No lockfile
-- **WHEN** no `ai-stash.lock.json` is present in the project root
-- **THEN** the system shows no unsynced badge and the sync shortcut does nothing
-
-#### Scenario: Orphaned assets excluded from unsynced count
-- **WHEN** some lockfile entries reference a registry name not in `registries[]`
-- **THEN** those entries are not counted as unsynced; they are shown separately in the Installed view with a warning
-
-### Requirement: Show unsynced badge in footer
-The system SHALL display a count of unsynced assets in the Browse view footer when one or more assets are missing locally.
-
-#### Scenario: Badge visible when assets are unsynced
-- **WHEN** the Browse view loads and unsynced assets are detected
-- **THEN** the footer shows `s sync (N)` where N is the count of unsynced assets
-
-#### Scenario: Badge hidden when fully synced
-- **WHEN** all lockfile assets are present on disk
-- **THEN** the footer shows no sync indicator
-
-### Requirement: Sync view accessible from Browse
-The system SHALL provide a Sync view reachable by pressing `s` in the Browse view that lists all unsynced assets.
-
-#### Scenario: Enter sync view
-- **WHEN** the user presses `s` from the Browse view and unsynced assets exist
-- **THEN** the system navigates to the Sync view showing the list of unsynced assets
-
-#### Scenario: No action when fully synced
-- **WHEN** the user presses `s` and no assets are unsynced
-- **THEN** the system does not navigate away from the Browse view
+## MODIFIED Requirements
 
 ### Requirement: Sync installs all missing assets
 The system SHALL install all unsynced assets in batch using the scope and targets recorded in the lockfile, without prompting the user for those values. For each asset, the system SHALL fetch from the registry URL stored in `InstalledAsset.registryUrl` and look up the asset by the name encoded in the lockfile key (the third segment of `"registry:type:name"`).
@@ -57,6 +18,27 @@ The system SHALL install all unsynced assets in batch using the scope and target
 #### Scenario: Sync completes
 - **WHEN** all unsynced assets have been processed
 - **THEN** the system shows a summary of installed, skipped, and orphaned assets, and refreshes the lockfile state
+
+### Requirement: Detect unsynced assets
+The system SHALL compare the lockfile's installed entries against the local filesystem and identify assets whose files are not present on disk. Orphaned assets (registry name not in `registries[]`) SHALL be excluded from the unsynced count and handled separately.
+
+#### Scenario: All assets present
+- **WHEN** every file listed in each lockfile entry exists on disk
+- **THEN** the system reports zero unsynced assets
+
+#### Scenario: Some assets missing
+- **WHEN** one or more non-orphaned lockfile entries have a missing first file on disk
+- **THEN** the system identifies those entries as unsynced
+
+#### Scenario: No lockfile
+- **WHEN** no `ai-stash.lock.json` is present in the project root
+- **THEN** the system shows no unsynced badge and the sync shortcut does nothing
+
+#### Scenario: Orphaned assets excluded from unsynced count
+- **WHEN** some lockfile entries reference a registry name not in `registries[]`
+- **THEN** those entries are not counted as unsynced; they are shown separately in the Installed view with a warning
+
+## ADDED Requirements
 
 ### Requirement: Migrate v1 lockfile to v2 on read
 The system SHALL automatically migrate a v1 lockfile to v2 format on first read, without requiring user action.

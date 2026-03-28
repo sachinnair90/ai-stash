@@ -11,6 +11,7 @@ interface InstallViewProps {
   onDone: () => void;
   onCancel: () => void;
   registryBaseUrl: string;
+  registryName: string;
   projectRoot: string;
   githubToken?: string;
 }
@@ -18,7 +19,13 @@ interface InstallViewProps {
 const scopes = ['project', 'global'] as const;
 const targetOptions = ['claude-code', 'copilot'] as const;
 
-export function InstallView({ assets, onDone, onCancel, registryBaseUrl, projectRoot, githubToken }: InstallViewProps) {
+interface SuffixNotice {
+  originalName: string;
+  suffixedName: string;
+  conflictingRegistry: string;
+}
+
+export function InstallView({ assets, onDone, onCancel, registryBaseUrl, registryName, projectRoot, githubToken }: InstallViewProps) {
   const [step, setStep] = useState<Step>('scope');
   const [scopeIndex, setScopeIndex] = useState(0);
   const [selectedTargets, setSelectedTargets] = useState<Set<string>>(new Set(['claude-code']));
@@ -26,6 +33,7 @@ export function InstallView({ assets, onDone, onCancel, registryBaseUrl, project
   const [results, setResults] = useState<Map<string, InstallFileStatus[]>>(new Map());
   const [installing, setInstalling] = useState(false);
   const [conflictFile, setConflictFile] = useState<string | null>(null);
+  const [suffixNotices, setSuffixNotices] = useState<SuffixNotice[]>([]);
 
   const runInstall = useCallback(async () => {
     setStep('progress');
@@ -43,6 +51,7 @@ export function InstallView({ assets, onDone, onCancel, registryBaseUrl, project
         targets: Array.from(selectedTargets),
         projectRoot,
         registryBaseUrl,
+        registryName,
         githubToken,
       }, (status) => {
         setResults((prev) => {
@@ -62,6 +71,10 @@ export function InstallView({ assets, onDone, onCancel, registryBaseUrl, project
         }
       });
 
+      if (result.suffixApplied) {
+        setSuffixNotices((prev) => [...prev, result.suffixApplied!]);
+      }
+
       setResults((prev) => {
         const next = new Map(prev);
         next.set(asset.name, result.files);
@@ -71,7 +84,7 @@ export function InstallView({ assets, onDone, onCancel, registryBaseUrl, project
 
     setInstalling(false);
     setStep('done');
-  }, [assets, scopeIndex, selectedTargets]);
+  }, [assets, scopeIndex, selectedTargets, registryBaseUrl, registryName, projectRoot, githubToken]);
 
   useInput((input, key) => {
     if (key.escape) {
@@ -203,6 +216,17 @@ export function InstallView({ assets, onDone, onCancel, registryBaseUrl, project
             </Box>
           ))}
         </Box>
+        {step === 'done' && suffixNotices.length > 0 && (
+          <Box marginTop={1} flexDirection="column">
+            {suffixNotices.map((n) => (
+              <Box key={n.suffixedName} flexDirection="column">
+                <Text color="yellow">⚠ Name conflict: </Text>
+                <Text dimColor>  "{n.originalName}" from "{registryName}" installed as "{n.suffixedName}"</Text>
+                <Text dimColor>  Reason: "{n.originalName}" already installed from registry "{n.conflictingRegistry}"</Text>
+              </Box>
+            ))}
+          </Box>
+        )}
         {step === 'done' && <Box marginTop={1}><Text dimColor>Press Enter to continue</Text></Box>}
       </Box>
     );

@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
-import fsp from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import type { RegistryAsset } from '../registry/types.js';
@@ -24,12 +23,16 @@ const mockAsset: RegistryAsset = {
   targets: ['claude-code'],
   files: ['main.md'],
   manifestUrl: 'https://example.com/manifest.json',
+  registryName: 'community',
 };
 
 const mockAssetV2: RegistryAsset = {
   ...mockAsset,
   version: '2.0.0',
 };
+
+const REGISTRY_URL = 'https://example.com';
+const LOCKFILE_KEY = 'community:skill:integration-skill';
 
 beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-stash-integration-'));
@@ -50,11 +53,11 @@ afterEach(() => {
 });
 
 describe('full install -> update -> remove cycle', () => {
-  it('completes the full lifecycle', async () => {
+  it('completes the full lifecycle with registry:type:name key format', async () => {
     // === INSTALL ===
     const lockfile: Lockfile = {
-      version: 1,
-      registry: 'https://example.com',
+      version: 2,
+      registries: [{ name: 'community', url: REGISTRY_URL }],
       installed: {},
     };
 
@@ -64,14 +67,15 @@ describe('full install -> update -> remove cycle', () => {
       'project',
       tmpDir,
       null,
-      'https://example.com/',
+      REGISTRY_URL + '/',
     );
 
-    const installResult = await executeInstall(installPlan, {}, tmpDir, lockfile);
+    const installResult = await executeInstall(installPlan, {}, tmpDir, lockfile, LOCKFILE_KEY, REGISTRY_URL);
 
-    // After install: lockfile entry exists
-    expect(lockfile.installed['integration-skill']).toBeDefined();
-    expect(lockfile.installed['integration-skill'].version).toBe('1.0.0');
+    // After install: lockfile entry exists with registry:type:name key
+    expect(lockfile.installed[LOCKFILE_KEY]).toBeDefined();
+    expect(lockfile.installed[LOCKFILE_KEY].version).toBe('1.0.0');
+    expect(lockfile.installed[LOCKFILE_KEY].registryUrl).toBe(REGISTRY_URL);
 
     // After install: files are on disk
     for (const file of installResult.installedFiles) {
@@ -82,10 +86,10 @@ describe('full install -> update -> remove cycle', () => {
     // Verify lockfile was written to disk
     const diskLockfile = readLockfile(tmpDir);
     expect(diskLockfile).not.toBeNull();
-    expect(diskLockfile!.installed['integration-skill']).toBeDefined();
+    expect(diskLockfile!.installed[LOCKFILE_KEY]).toBeDefined();
+    expect(diskLockfile!.registries).toHaveLength(1);
 
     // === UPDATE ===
-    // Update fetch mock to return v2 content
     vi.stubGlobal(
       'fetch',
       vi.fn().mockImplementation(async (url: string) => ({
@@ -101,10 +105,9 @@ describe('full install -> update -> remove cycle', () => {
       'project',
       tmpDir,
       lockfile,
-      'https://example.com/',
+      REGISTRY_URL + '/',
     );
 
-    // Conflicts should be managed since the asset is already installed
     for (const conflict of updatePlan.conflicts) {
       expect(conflict.isManaged).toBe(true);
     }
@@ -114,12 +117,10 @@ describe('full install -> update -> remove cycle', () => {
       resolutions[conflict.filePath] = 'overwrite';
     }
 
-    const updateResult = await executeInstall(updatePlan, resolutions, tmpDir, lockfile);
+    const updateResult = await executeInstall(updatePlan, resolutions, tmpDir, lockfile, LOCKFILE_KEY, REGISTRY_URL);
 
-    // After update: lockfile version updated
-    expect(lockfile.installed['integration-skill'].version).toBe('2.0.0');
+    expect(lockfile.installed[LOCKFILE_KEY].version).toBe('2.0.0');
 
-    // After update: files replaced with new content
     for (const file of updateResult.installedFiles) {
       const fullPath = path.join(tmpDir, file);
       const content = fs.readFileSync(fullPath, 'utf-8');
@@ -127,20 +128,89 @@ describe('full install -> update -> remove cycle', () => {
     }
 
     // === REMOVE ===
-    await removeAssetFull('integration-skill', tmpDir, lockfile);
+    await removeAssetFull(LOCKFILE_KEY, tmpDir, lockfile);
 
-    // After remove: lockfile entry gone
-    expect(lockfile.installed['integration-skill']).toBeUndefined();
+    expect(lockfile.installed[LOCKFILE_KEY]).toBeUndefined();
 
-    // After remove: files deleted
     for (const file of updateResult.installedFiles) {
       const fullPath = path.join(tmpDir, file);
       expect(fs.existsSync(fullPath)).toBe(false);
     }
 
-    // Verify lockfile on disk is updated
     const finalLockfile = readLockfile(tmpDir);
     expect(finalLockfile).not.toBeNull();
-    expect(finalLockfile!.installed['integration-skill']).toBeUndefined();
+    expect(finalLockfile!.installed[LOCKFILE_KEY]).toBeUndefined();
+  });
+});
+
+describe('multi-registry conflict suffix', () => {
+  it('applies suffix when same type+name exists from different registry', async () => {
+    const lockfile: Lockfile = {
+      version: 2,
+      registries: [
+        { name: 'community', url: REGISTRY_URL },
+        { name: 'acme', url: 'https://acme.com' },
+      ],
+      installed: {
+        'community:skill:integration-skill': {
+          type: 'skill',
+          version: '1.0.0',
+          installedAt: '2026-01-01T00:00:00Z',
+          targets: ['claude-code'],
+          scope: 'project',
+          files: ['.claude/skills/integration-skill/main.md'],
+          registryUrl: REGISTRY_URL,
+        },
+      },
+    };
+    writeLockfile(tmpDir, lockfile);
+
+    const acmeAsset: RegistryAsset = { ...mockAsset, registryName: 'acme' };
+
+    // installAsset uses resolveForInstall internally
+    const { resolveForInstall } = await import('../engine/install.js');
+    const resolved = resolveForInstall(acmeAsset, 'acme', 'https://acme.com', lockfile);
+
+    expect(resolved.suffixApplied).toBe(true);
+    expect(resolved.resolvedAsset.name).toBe('integration-skill-acme');
+    expect(resolved.lockfileKey).toBe('acme:skill:integration-skill');
+  });
+});
+
+describe('orphaned assets', () => {
+  it('getUnsyncedAssets excludes orphaned entries', async () => {
+    const { getUnsyncedAssets } = await import('../lockfile/index.js');
+
+    const lockfile: Lockfile = {
+      version: 2,
+      registries: [{ name: 'community', url: REGISTRY_URL }],
+      installed: {
+        // Orphaned: registry "removed-registry" not in registries[]
+        'removed-registry:skill:orphan': {
+          type: 'skill',
+          version: '1.0.0',
+          installedAt: '2026-01-01T00:00:00Z',
+          targets: ['claude-code'],
+          scope: 'project',
+          files: ['.claude/skills/orphan/main.md'],
+          registryUrl: 'https://removed.com',
+        },
+        // Non-orphaned but missing from disk
+        'community:skill:missing': {
+          type: 'skill',
+          version: '1.0.0',
+          installedAt: '2026-01-01T00:00:00Z',
+          targets: ['claude-code'],
+          scope: 'project',
+          files: ['.claude/skills/missing/main.md'],
+          registryUrl: REGISTRY_URL,
+        },
+      },
+    };
+
+    const unsynced = getUnsyncedAssets(lockfile, tmpDir);
+    // Should only include non-orphaned missing assets
+    expect(unsynced.some((u) => u.name === 'community:skill:missing')).toBe(true);
+    expect(unsynced.some((u) => u.name === 'removed-registry:skill:orphan')).toBe(false);
   });
 });

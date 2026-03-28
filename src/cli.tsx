@@ -4,6 +4,14 @@ if (nodeVersion < 18) {
   process.exit(1);
 }
 
+// Handle registry subcommands before rendering TUI
+const args = process.argv.slice(2);
+if (args[0] === 'registry') {
+  const { handleRegistryCommand } = await import('./commands/registry.js');
+  handleRegistryCommand(args.slice(1));
+  process.exit(0);
+}
+
 // Dynamic imports ensure the version check above runs before any module code executes
 const { render } = await import('ink');
 const { App } = await import('./ui/App.js');

@@ -33,7 +33,7 @@ export async function fetchRegistry(url: string, token?: string): Promise<Regist
     const items = (data as unknown as Record<string, unknown>)[bucket] as Omit<RegistryAsset, 'type'>[] | undefined;
     if (items) {
       for (const item of items) {
-        assets.push({ ...item, type });
+        assets.push({ ...item, type, registryName: '' });
       }
     }
   }

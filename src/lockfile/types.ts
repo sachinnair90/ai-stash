@@ -1,3 +1,8 @@
+export interface RegistryConfig {
+  name: string;
+  url: string;
+}
+
 export interface InstalledAsset {
   type: string;
   version: string;
@@ -5,10 +10,11 @@ export interface InstalledAsset {
   targets: string[];
   scope: string;
   files: string[];
+  registryUrl: string;
 }
 
 export interface Lockfile {
-  version: 1;
-  registry: string;
+  version: 2;
+  registries: RegistryConfig[];
   installed: Record<string, InstalledAsset>;
 }

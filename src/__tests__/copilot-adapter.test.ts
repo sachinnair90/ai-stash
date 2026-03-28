@@ -16,6 +16,7 @@ function makeAsset(overrides: Partial<RegistryAsset> = {}): RegistryAsset {
     targets: ['copilot'],
     files: ['main.md'],
     manifestUrl: 'https://example.com/manifest.json',
+    registryName: 'test',
     ...overrides,
   };
 }
@@ -197,6 +198,7 @@ describe('removeAsset', () => {
       targets: ['copilot'],
       scope: 'project',
       files: ['.github/skills/test-asset/main.md'],
+      registryUrl: 'https://example.com',
     };
 
     await copilotAdapter.removeAsset(installed, tmpDir);

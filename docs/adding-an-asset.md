@@ -199,8 +199,9 @@ Start the local registry server and run the TUI:
 # in the registry directory
 npx serve . --listen 3456
 
-# in another terminal, from the repo root
-REGISTRY_URL=http://localhost:3456/registry.json pnpm run dev
+# in another terminal, from the repo root — add the local registry then launch
+ai-stash registry add http://localhost:3456/registry.json --name local
+pnpm run dev
 ```
 
 Clear the cache first if you made changes to an existing registry:

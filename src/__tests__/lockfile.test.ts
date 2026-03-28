@@ -22,16 +22,17 @@ afterEach(() => {
 });
 
 const sampleLockfile: Lockfile = {
-  version: 1,
-  registry: 'https://example.com/registry.json',
+  version: 2,
+  registries: [{ name: 'community', url: 'https://example.com/registry.json' }],
   installed: {
-    'my-asset': {
+    'community:skill:my-asset': {
       type: 'skill',
       version: '1.0.0',
       installedAt: '2026-01-01T00:00:00Z',
       targets: ['claude-code'],
       scope: 'project',
       files: ['.claude/skills/my-asset/main.md'],
+      registryUrl: 'https://example.com/registry.json',
     },
   },
 };
@@ -42,37 +43,90 @@ describe('readLockfile', () => {
     expect(result).toBeNull();
   });
 
-  it('parses valid lockfile correctly', () => {
+  it('parses valid v2 lockfile correctly', () => {
     const lockfilePath = path.join(tmpDir, 'ai-stash.lock.json');
     fs.writeFileSync(lockfilePath, JSON.stringify(sampleLockfile, null, 2), 'utf-8');
 
     const result = readLockfile(tmpDir);
     expect(result).toEqual(sampleLockfile);
-    expect(result!.version).toBe(1);
-    expect(result!.installed['my-asset'].version).toBe('1.0.0');
+    expect(result!.version).toBe(2);
+    expect(result!.registries[0].name).toBe('community');
+    expect(result!.installed['community:skill:my-asset'].version).toBe('1.0.0');
   });
 
-  it('coerces legacy type "prompt" to "command" at read time', () => {
-    const legacyLockfile = {
+  it('migrates v1 lockfile to v2 on read', () => {
+    const v1Lockfile = {
       version: 1,
       registry: 'https://example.com/registry.json',
       installed: {
-        'my-prompt': {
-          type: 'prompt',
+        'my-asset': {
+          type: 'skill',
           version: '1.0.0',
           installedAt: '2026-01-01T00:00:00Z',
           targets: ['claude-code'],
           scope: 'project',
-          files: ['.claude/skills/my-prompt/SKILL.md'],
+          files: ['.claude/skills/my-asset/main.md'],
         },
       },
     };
 
     const lockfilePath = path.join(tmpDir, 'ai-stash.lock.json');
-    fs.writeFileSync(lockfilePath, JSON.stringify(legacyLockfile, null, 2), 'utf-8');
+    fs.writeFileSync(lockfilePath, JSON.stringify(v1Lockfile, null, 2), 'utf-8');
 
     const result = readLockfile(tmpDir);
-    expect(result!.installed['my-prompt'].type).toBe('command');
+    expect(result).not.toBeNull();
+    expect(result!.version).toBe(2);
+    expect(result!.registries).toHaveLength(1);
+    expect(result!.registries[0].url).toBe('https://example.com/registry.json');
+
+    // Key must be rekeyed to registry:type:name
+    const keys = Object.keys(result!.installed);
+    expect(keys).toHaveLength(1);
+    expect(keys[0]).toMatch(/^[\w-]+:skill:my-asset$/);
+
+    // registryUrl backfilled
+    expect(Object.values(result!.installed)[0].registryUrl).toBe('https://example.com/registry.json');
+  });
+
+  it('writes v1.bak backup during migration', () => {
+    const v1Lockfile = {
+      version: 1,
+      registry: 'https://example.com/registry.json',
+      installed: {},
+    };
+    const lockfilePath = path.join(tmpDir, 'ai-stash.lock.json');
+    fs.writeFileSync(lockfilePath, JSON.stringify(v1Lockfile, null, 2), 'utf-8');
+
+    readLockfile(tmpDir);
+
+    const backupPath = lockfilePath + '.v1.bak';
+    expect(fs.existsSync(backupPath)).toBe(true);
+    const backup = JSON.parse(fs.readFileSync(backupPath, 'utf-8'));
+    expect(backup.version).toBe(1);
+  });
+
+  it('coerces legacy type "prompt" to "command" at read time', () => {
+    const lockfileWithPrompt: Lockfile = {
+      version: 2,
+      registries: [{ name: 'test', url: 'https://example.com/registry.json' }],
+      installed: {
+        'test:command:my-prompt': {
+          type: 'prompt',
+          version: '1.0.0',
+          installedAt: '2026-01-01T00:00:00Z',
+          targets: ['claude-code'],
+          scope: 'project',
+          files: ['.claude/commands/my-prompt.md'],
+          registryUrl: 'https://example.com/registry.json',
+        },
+      },
+    };
+
+    const lockfilePath = path.join(tmpDir, 'ai-stash.lock.json');
+    fs.writeFileSync(lockfilePath, JSON.stringify(lockfileWithPrompt, null, 2), 'utf-8');
+
+    const result = readLockfile(tmpDir);
+    expect(result!.installed['test:command:my-prompt'].type).toBe('command');
   });
 });
 
@@ -90,7 +144,11 @@ describe('writeLockfile', () => {
 });
 
 describe('isInstalled', () => {
-  it('returns true for installed asset', () => {
+  it('returns true for installed asset by lockfile key', () => {
+    expect(isInstalled(sampleLockfile, 'community:skill:my-asset')).toBe(true);
+  });
+
+  it('returns true for installed asset by bare name', () => {
     expect(isInstalled(sampleLockfile, 'my-asset')).toBe(true);
   });
 
@@ -104,7 +162,11 @@ describe('isInstalled', () => {
 });
 
 describe('getInstalledVersion', () => {
-  it('returns correct version for installed asset', () => {
+  it('returns correct version by lockfile key', () => {
+    expect(getInstalledVersion(sampleLockfile, 'community:skill:my-asset')).toBe('1.0.0');
+  });
+
+  it('returns correct version by bare name', () => {
     expect(getInstalledVersion(sampleLockfile, 'my-asset')).toBe('1.0.0');
   });
 
@@ -119,11 +181,11 @@ describe('getInstalledVersion', () => {
 
 describe('isUpdateAvailable', () => {
   it('detects version mismatch', () => {
-    expect(isUpdateAvailable(sampleLockfile, 'my-asset', '2.0.0')).toBe(true);
+    expect(isUpdateAvailable(sampleLockfile, 'community:skill:my-asset', '2.0.0')).toBe(true);
   });
 
   it('returns false when versions match', () => {
-    expect(isUpdateAvailable(sampleLockfile, 'my-asset', '1.0.0')).toBe(false);
+    expect(isUpdateAvailable(sampleLockfile, 'community:skill:my-asset', '1.0.0')).toBe(false);
   });
 
   it('returns false for uninstalled asset', () => {

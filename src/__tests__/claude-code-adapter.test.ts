@@ -17,6 +17,7 @@ function makeAsset(overrides: Partial<RegistryAsset> = {}): RegistryAsset {
     targets: ['claude-code'],
     files: ['main.md'],
     manifestUrl: 'https://example.com/manifest.json',
+    registryName: 'test',
     ...overrides,
   };
 }
@@ -206,6 +207,7 @@ describe('removeAsset', () => {
       targets: ['claude-code'],
       scope: 'project',
       files: ['.claude/skills/test-asset/main.md'],
+      registryUrl: 'https://example.com',
     };
 
     await claudeCodeAdapter.removeAsset(installed, tmpDir);

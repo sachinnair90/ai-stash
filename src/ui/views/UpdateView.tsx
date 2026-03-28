@@ -3,60 +3,59 @@ import { Box, Text, useInput } from 'ink';
 import Spinner from 'ink-spinner';
 import type { RegistryAsset } from '../../registry/types.js';
 import type { Lockfile } from '../../lockfile/types.js';
-import { isUpdateAvailable, getInstalledVersion } from '../../lockfile/index.js';
-import { updateAsset, updateAll, type UpdateResult } from '../../engine/update.js';
+import { checkUpdates, updateAsset, updateAll, type UpdateResult, type UpdateCheck } from '../../engine/update.js';
 
 interface UpdateViewProps {
   assets: RegistryAsset[];
   lockfile: Lockfile | null;
-  registryBaseUrl: string;
   projectRoot: string;
   onDone: () => void;
   githubToken?: string;
 }
 
-export function UpdateView({ assets, lockfile, registryBaseUrl, projectRoot, onDone, githubToken }: UpdateViewProps) {
-  const updatable = assets.filter((a) => isUpdateAvailable(lockfile, a.name, a.version));
+export function UpdateView({ assets, lockfile, projectRoot, onDone, githubToken }: UpdateViewProps) {
+  const updates = checkUpdates(lockfile, assets);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [updating, setUpdating] = useState(false);
 
-  // Clamp selectedIndex when updatable shrinks (e.g. after a successful update)
   useEffect(() => {
-    if (updatable.length > 0) {
-      setSelectedIndex((i) => Math.min(updatable.length - 1, Math.max(0, i)));
+    if (updates.length > 0) {
+      setSelectedIndex((i) => Math.min(updates.length - 1, Math.max(0, i)));
     }
-  }, [updatable.length]);
+  }, [updates.length]);
   const [results, setResults] = useState<UpdateResult[]>([]);
 
   const handleUpdateOne = useCallback(async () => {
-    if (!lockfile || updatable.length === 0) return;
+    if (!lockfile || updates.length === 0) return;
     setUpdating(true);
-    const asset = updatable[selectedIndex];
-    const result = await updateAsset(asset, lockfile, projectRoot, registryBaseUrl, githubToken);
+    const update = updates[selectedIndex];
+    const asset = assets.find((a) => a.name === update.name && a.registryName === update.lockfileKey.split(':')[0]);
+    if (!asset) { setUpdating(false); return; }
+    const result = await updateAsset(asset, update.lockfileKey, lockfile, projectRoot, githubToken);
     setResults((prev) => [...prev, result]);
     setUpdating(false);
-  }, [lockfile, updatable, selectedIndex, registryBaseUrl, projectRoot, githubToken]);
+  }, [lockfile, updates, selectedIndex, projectRoot, githubToken, assets]);
 
   const handleUpdateAll = useCallback(async () => {
-    if (!lockfile || updatable.length === 0) return;
+    if (!lockfile || updates.length === 0) return;
     setUpdating(true);
-    const allResults = await updateAll(updatable, lockfile, projectRoot, registryBaseUrl, githubToken);
+    const allResults = await updateAll(updates, assets, lockfile, projectRoot, githubToken);
     setResults(allResults);
     setUpdating(false);
-  }, [lockfile, updatable, registryBaseUrl, projectRoot, githubToken]);
+  }, [lockfile, updates, assets, projectRoot, githubToken]);
 
   useInput((input, key) => {
     if (key.escape) {
       onDone();
       return;
     }
-    if (key.upArrow && updatable.length > 0) setSelectedIndex((i) => Math.max(0, i - 1));
-    if (key.downArrow && updatable.length > 0) setSelectedIndex((i) => Math.min(updatable.length - 1, i + 1));
+    if (key.upArrow && updates.length > 0) setSelectedIndex((i) => Math.max(0, i - 1));
+    if (key.downArrow && updates.length > 0) setSelectedIndex((i) => Math.min(updates.length - 1, i + 1));
     if (input === 'u' && !updating) void handleUpdateOne();
     if (input === 'U' && !updating) void handleUpdateAll();
   });
 
-  if (updatable.length === 0) {
+  if (updates.length === 0) {
     return (
       <Box flexDirection="column" padding={1}>
         <Text bold>Updates</Text>
@@ -68,7 +67,7 @@ export function UpdateView({ assets, lockfile, registryBaseUrl, projectRoot, onD
 
   return (
     <Box flexDirection="column" padding={1}>
-      <Text bold>Available Updates ({updatable.length})</Text>
+      <Text bold>Available Updates ({updates.length})</Text>
       {updating && (
         <Box>
           <Spinner type="dots" />
@@ -76,19 +75,18 @@ export function UpdateView({ assets, lockfile, registryBaseUrl, projectRoot, onD
         </Box>
       )}
       <Box marginTop={1} flexDirection="column">
-        {updatable.map((asset, index) => {
-          const installed = getInstalledVersion(lockfile, asset.name) ?? '?';
-          const wasUpdated = results.some((r) => r.asset === asset.name && r.success);
+        {updates.map((update, index) => {
+          const wasUpdated = results.some((r) => r.asset === update.name && r.success);
           return (
-            <Box key={asset.name}>
+            <Box key={update.lockfileKey}>
               <Text inverse={index === selectedIndex}>
                 {wasUpdated ? (
                   <Text color="green">✓ </Text>
                 ) : (
                   <Text color="yellow">↑ </Text>
                 )}
-                <Text>{asset.name} </Text>
-                <Text dimColor>{installed} → {asset.version}</Text>
+                <Text>{update.name} </Text>
+                <Text dimColor>{update.installedVersion} → {update.latestVersion}</Text>
               </Text>
             </Box>
           );
