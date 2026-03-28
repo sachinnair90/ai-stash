@@ -26,11 +26,18 @@ function resolveGithubToken(): string | undefined {
   return undefined;
 }
 
-export function loadConfig(): Config {
+export interface LoadConfigResult {
+  config: Config;
+  isFirstRun: boolean;
+}
+
+export function loadConfig(): LoadConfigResult {
   const configDir = getConfigDir();
   const configPath = path.join(configDir, 'config.json');
 
   let config: Config;
+  let isFirstRun = false;
+
   if (fs.existsSync(configPath)) {
     const raw = fs.readFileSync(configPath, 'utf-8');
     let parsed: Partial<Config>;
@@ -49,17 +56,24 @@ export function loadConfig(): Config {
       },
     };
   } else {
-    // Create config directory and default config file
-    fs.mkdirSync(configDir, { recursive: true });
-    fs.writeFileSync(configPath, JSON.stringify(DEFAULT_CONFIG, null, 2), 'utf-8');
     config = { ...DEFAULT_CONFIG };
+    isFirstRun = true;
   }
 
   if (process.env['REGISTRY_URL']) {
     config.registry = { ...config.registry, url: process.env['REGISTRY_URL'] };
+    isFirstRun = false;
   }
 
   config.githubToken = config.githubToken ?? resolveGithubToken();
 
-  return config;
+  return { config, isFirstRun };
+}
+
+export function saveConfig(config: Config): void {
+  const configDir = getConfigDir();
+  const configPath = path.join(configDir, 'config.json');
+  fs.mkdirSync(configDir, { recursive: true });
+  const { githubToken: _, ...toSave } = config;
+  fs.writeFileSync(configPath, JSON.stringify(toSave, null, 2), 'utf-8');
 }

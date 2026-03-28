@@ -11,10 +11,11 @@ import { UpdateView } from './views/UpdateView.js';
 import { InstalledView } from './views/InstalledView.js';
 import { RemoveView } from './views/RemoveView.js';
 import { SyncView } from './views/SyncView.js';
+import { SetupView } from './views/SetupView.js';
 import { useFilter } from './hooks/useFilter.js';
 import type { RegistryAsset } from '../registry/types.js';
 import type { Lockfile } from '../lockfile/types.js';
-import { loadConfig } from '../config/loader.js';
+import { loadConfig, saveConfig } from '../config/loader.js';
 import { getRegistry } from '../registry/client.js';
 import { readLockfile } from '../lockfile/reader.js';
 import { getProjectRoot } from '../config/paths.js';
@@ -39,7 +40,7 @@ export function App() {
   const { exit } = useApp();
 
   // Data loading
-  const [loadState, setLoadState] = useState<'loading' | 'error' | 'ready'>('loading');
+  const [loadState, setLoadState] = useState<'setup' | 'loading' | 'error' | 'ready'>('loading');
   const [errorMsg, setErrorMsg] = useState('');
   const [assets, setAssets] = useState<RegistryAsset[]>([]);
   const [lockfile, setLockfile] = useState<Lockfile | null>(null);
@@ -63,30 +64,39 @@ export function App() {
   const [searchActive, setSearchActive] = useState(false);
   const { search, setSearch, typeFilter, targetFilter, filtered } = useFilter(assets);
 
-  useEffect(() => {
-    async function load() {
-      try {
-        const config = loadConfig();
-        setRegistryBaseUrl(config.registry.url);
-        setGithubToken(config.githubToken);
-        const root = getProjectRoot(process.cwd()) ?? process.cwd();
-        setProjectRoot(root);
-        setLockfile(readLockfile(root));
-        const { registry, stale, cacheAge } = await getRegistry(config);
-        setAssets(registry.assets);
-        setUnsyncedCount(getUnsyncedAssets(readLockfile(root), root).length);
-        if (stale) {
-          const mins = Math.round(cacheAge / 60000);
-          setStaleWarning(`Using cached registry (${mins}m old)`);
-        }
-        setLoadState('ready');
-      } catch (e) {
-        setErrorMsg(e instanceof Error ? e.message : String(e));
-        setLoadState('error');
+  const loadRegistry = useCallback(async (registryUrl?: string) => {
+    try {
+      const { config, isFirstRun } = loadConfig();
+      if (isFirstRun && !registryUrl) {
+        setLoadState('setup');
+        return;
       }
+      if (registryUrl) {
+        config.registry = { ...config.registry, url: registryUrl };
+        saveConfig(config);
+      }
+      setRegistryBaseUrl(config.registry.url);
+      setGithubToken(config.githubToken);
+      const root = getProjectRoot(process.cwd()) ?? process.cwd();
+      setProjectRoot(root);
+      setLockfile(readLockfile(root));
+      const { registry, stale, cacheAge } = await getRegistry(config);
+      setAssets(registry.assets);
+      setUnsyncedCount(getUnsyncedAssets(readLockfile(root), root).length);
+      if (stale) {
+        const mins = Math.round(cacheAge / 60000);
+        setStaleWarning(`Using cached registry (${mins}m old)`);
+      }
+      setLoadState('ready');
+    } catch (e) {
+      setErrorMsg(e instanceof Error ? e.message : String(e));
+      setLoadState('error');
     }
-    void load();
   }, []);
+
+  useEffect(() => {
+    void loadRegistry();
+  }, [loadRegistry]);
 
   const refreshLockfile = useCallback(() => {
     if (projectRoot) {
@@ -150,6 +160,17 @@ export function App() {
       }
     }
   });
+
+  if (loadState === 'setup') {
+    return (
+      <SetupView
+        onDone={(url) => {
+          setLoadState('loading');
+          void loadRegistry(url);
+        }}
+      />
+    );
+  }
 
   if (loadState === 'loading') {
     return (
