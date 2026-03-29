@@ -4,9 +4,9 @@ import type { RegistryAsset, AssetManifest } from '../registry/types.js';
 import type { Lockfile } from '../lockfile/types.js';
 import { getAdapter } from '../adapters/registry.js';
 import { writeLockfile } from '../lockfile/writer.js';
-import { installAssetFull, buildScriptNotice } from './install.js';
+import { installAssetFull, buildScriptNotice, planInstall, executeInstall, resolveForInstall } from './install.js';
 import { fetchManifest } from '../registry/fetcher.js';
-import type { InstallResult } from './types.js';
+import type { InstallResult, InstallPlan } from './types.js';
 
 // TUI-compatible types
 export interface UpdateResult {
@@ -14,6 +14,9 @@ export interface UpdateResult {
   fromVersion: string;
   toVersion: string;
   success: boolean;
+  scriptChanged?: boolean;
+  scriptRisksContent?: string;
+  scriptsForDisclaimer?: string[];
 }
 
 export interface RemoveResult {
@@ -71,6 +74,77 @@ export function checkUpdates(
 }
 
 /**
+ * Plan an update for a single asset without executing it.
+ * Detects whether scripts have changed. Has no side effects.
+ * Returns null if the asset or registry entry cannot be found.
+ */
+export async function planUpdateFull(
+  lockfileKey: string,
+  projectRoot: string,
+  lockfile: Lockfile,
+  registry: RegistryAsset[],
+  githubToken?: string,
+): Promise<{ plan: InstallPlan; scriptChanged: boolean } | null> {
+  const parts = lockfileKey.split(':');
+  if (parts.length < 3) return null;
+  const registryName = parts[0];
+  const assetName = parts.slice(2).join(':');
+
+  const registryAsset = registry.find(
+    (a) => a.name === assetName && a.registryName === registryName,
+  ) ?? registry.find((a) => a.name === assetName);
+
+  if (!registryAsset) return null;
+
+  const installed = lockfile.installed[lockfileKey];
+  if (!installed) return null;
+
+  const { resolvedAsset: innerResolvedAsset } = resolveForInstall(
+    registryAsset,
+    registryName,
+    installed.registryUrl,
+    lockfile,
+  );
+
+  const plan = await planInstall(
+    innerResolvedAsset,
+    installed.targets,
+    installed.scope as 'project' | 'global',
+    projectRoot,
+    lockfile,
+    installed.registryUrl,
+    githubToken,
+  );
+
+  // Detect script changes (same logic as updateAssetFull, no side effects)
+  let scriptChanged = false;
+  if (plan.scriptHashesForPlan) {
+    const storedHashes = installed.scriptHashes ?? {};
+    for (const [key, hash] of Object.entries(plan.scriptHashesForPlan)) {
+      const stored = storedHashes[key as keyof typeof storedHashes];
+      if (stored !== hash) { scriptChanged = true; break; }
+    }
+    if (!scriptChanged) {
+      const incomingKeys = new Set(Object.keys(plan.scriptHashesForPlan));
+      const storedKeys = new Set(Object.keys(storedHashes));
+      for (const k of incomingKeys) {
+        if (!storedKeys.has(k)) { scriptChanged = true; break; }
+      }
+      if (!scriptChanged) {
+        for (const k of storedKeys) {
+          if (!incomingKeys.has(k)) { scriptChanged = true; break; }
+        }
+      }
+    }
+  } else if (installed.scriptHashes && Object.keys(installed.scriptHashes).length > 0) {
+    scriptChanged = true;
+  }
+
+  plan.scriptChanged = scriptChanged;
+  return { plan, scriptChanged };
+}
+
+/**
  * Update a single asset to the latest registry version.
  * For folder-based assets: fetches new manifest, preserves configuredFiles,
  * and sets reconfigurationNeeded flag unless configStable is declared.
@@ -81,6 +155,7 @@ export async function updateAssetFull(
   lockfile: Lockfile,
   registry: RegistryAsset[],
   githubToken?: string,
+  options?: { riskAccepted?: boolean; riskAcceptedAt?: string },
 ): Promise<InstallResult> {
   const parts = lockfileKey.split(':');
   if (parts.length < 3) throw new Error(`Invalid lockfile key: "${lockfileKey}"`);
@@ -110,28 +185,105 @@ export async function updateAssetFull(
     }
   }
 
-  const result = await installAssetFull(
+  // Detect script changes by hashing incoming scripts against stored hashes (tasks 4.1-4.2)
+  let scriptChanged = false;
+
+  // Run planInstall to get the incoming hashes before writing anything
+  const { resolvedAsset: innerResolvedAsset, lockfileKey: innerLockfileKey } = resolveForInstall(
     registryAsset,
+    registryName,
+    installed.registryUrl,
+    lockfile,
+  );
+
+  const incomingPlan = await planInstall(
+    innerResolvedAsset,
     installed.targets,
     installed.scope as 'project' | 'global',
     projectRoot,
-    installed.registryUrl,
     lockfile,
-    registryName,
+    installed.registryUrl,
     githubToken,
-    undefined,
-    { skipConfiguredFiles: !!newManifest },
   );
+
+  // Compare incoming script hashes vs stored hashes (task 4.1-4.2)
+  if (incomingPlan.scriptHashesForPlan) {
+    const storedHashes = installed.scriptHashes ?? {};
+    for (const [key, hash] of Object.entries(incomingPlan.scriptHashesForPlan)) {
+      const stored = storedHashes[key as keyof typeof storedHashes];
+      if (stored !== hash) {
+        scriptChanged = true;
+        break;
+      }
+    }
+    // Also scriptChanged if a script was added (present in new but not old)
+    if (!scriptChanged) {
+      const incomingKeys = new Set(Object.keys(incomingPlan.scriptHashesForPlan));
+      const storedKeys = new Set(Object.keys(storedHashes));
+      // New script added
+      for (const k of incomingKeys) {
+        if (!storedKeys.has(k)) { scriptChanged = true; break; }
+      }
+      // Script removed
+      if (!scriptChanged) {
+        for (const k of storedKeys) {
+          if (!incomingKeys.has(k)) { scriptChanged = true; break; }
+        }
+      }
+    }
+  } else if (installed.scriptHashes && Object.keys(installed.scriptHashes).length > 0) {
+    // Scripts removed in new version
+    scriptChanged = true;
+  }
+
+  // Attach scriptChanged flag to the plan for callers
+  incomingPlan.scriptChanged = scriptChanged;
+
+  // Reset risk acceptance when scripts changed (task 4.4) — do before install
+  if (scriptChanged) {
+    installed.riskAccepted = undefined;
+    installed.riskAcceptedAt = undefined;
+    lockfile.installed[lockfileKey] = installed;
+  }
+
+  // Build resolutions (managed = overwrite)
+  const resolutions: Record<string, import('./types.js').ConflictResolution> = {};
+  for (const c of incomingPlan.conflicts) {
+    resolutions[c.filePath] = 'overwrite';
+  }
+
+  const result = await executeInstall(
+    incomingPlan,
+    resolutions,
+    projectRoot,
+    lockfile,
+    innerLockfileKey,
+    installed.registryUrl,
+    { skipConfiguredFiles: !!newManifest, riskAccepted: options?.riskAccepted, riskAcceptedAt: options?.riskAcceptedAt },
+  );
+
+  // (task 4.3) Delete .setup-complete after writes when scripts changed
+  if (scriptChanged && incomingPlan.manifest?.scripts?.postInstall) {
+    if (result.installedFiles.length > 0) {
+      const assetDir = path.dirname(path.join(projectRoot, result.installedFiles[0]));
+      const markerPath = path.join(assetDir, '.setup-complete');
+      if (fs.existsSync(markerPath)) {
+        fs.unlinkSync(markerPath);
+      }
+    }
+  }
 
   // Set reconfigurationNeeded flag for folder-based assets with userConfig (task 7.3)
   if (newManifest?.userConfig && Object.keys(newManifest.userConfig).length > 0) {
     if (!newManifest.configStable) {
       result.lockfileEntry.reconfigurationNeeded = true;
-      lockfile.installed[lockfileKey] = result.lockfileEntry;
+      lockfile.installed[innerLockfileKey] = result.lockfileEntry;
       writeLockfile(projectRoot, lockfile);
     }
   }
 
+  result.scriptChanged = scriptChanged;
+  result.plan = incomingPlan;
   return result;
 }
 
@@ -214,6 +366,26 @@ export async function removeAssetFull(
 // --- TUI-compatible wrappers ---
 
 /**
+ * TUI-compatible: plan an update without executing.
+ * Returns plan info for showing a disclaimer before executing.
+ */
+export async function planUpdateResult(
+  asset: RegistryAsset,
+  lockfileKey: string,
+  lockfile: Lockfile,
+  projectRoot: string,
+  githubToken?: string,
+): Promise<{ plan: InstallPlan; scriptChanged: boolean; scriptsForDisclaimer: string[] } | null> {
+  const planResult = await planUpdateFull(lockfileKey, projectRoot, lockfile, [asset], githubToken);
+  if (!planResult) return null;
+  const scripts = planResult.plan.manifest?.scripts;
+  const scriptsForDisclaimer: string[] = [];
+  if (scripts?.postInstall) scriptsForDisclaimer.push(`postInstall: ${scripts.postInstall}`);
+  if (scripts?.postUninstall) scriptsForDisclaimer.push(`postUninstall: ${scripts.postUninstall}`);
+  return { ...planResult, scriptsForDisclaimer };
+}
+
+/**
  * TUI-compatible updateAsset.
  * Matches the signature expected by UpdateView.tsx.
  */
@@ -223,17 +395,25 @@ export async function updateAsset(
   lockfile: Lockfile,
   projectRoot: string,
   githubToken?: string,
+  riskOptions?: { riskAccepted: boolean; riskAcceptedAt: string },
 ): Promise<UpdateResult> {
   const installed = lockfile.installed[lockfileKey];
   const fromVersion = installed?.version ?? '0.0.0';
 
   try {
-    await updateAssetFull(lockfileKey, projectRoot, lockfile, [asset], githubToken);
+    const fullResult = await updateAssetFull(lockfileKey, projectRoot, lockfile, [asset], githubToken, riskOptions);
+    const scripts = fullResult.plan?.manifest?.scripts;
+    const scriptsForDisclaimer: string[] = [];
+    if (scripts?.postInstall) scriptsForDisclaimer.push(`postInstall: ${scripts.postInstall}`);
+    if (scripts?.postUninstall) scriptsForDisclaimer.push(`postUninstall: ${scripts.postUninstall}`);
     return {
       asset: asset.name,
       fromVersion,
       toVersion: asset.version,
       success: true,
+      scriptChanged: fullResult.scriptChanged,
+      scriptRisksContent: fullResult.plan?.scriptRisksContent,
+      scriptsForDisclaimer: scriptsForDisclaimer.length > 0 ? scriptsForDisclaimer : undefined,
     };
   } catch {
     return {

@@ -160,3 +160,63 @@ describe('handleListCommand — reconfiguration needed indicator', () => {
     expect(rows.some((r) => r.includes('reconfiguration needed'))).toBe(true);
   });
 });
+
+// ──────────────────────────────────────────────────────────────────────
+// [has scripts] annotation for assets with scriptHashes (task 12.5)
+// ──────────────────────────────────────────────────────────────────────
+
+describe('handleListCommand — [has scripts] annotation', () => {
+  it('appends [has scripts] to the name row for an asset with scriptHashes in lockfile', () => {
+    mockCheckSetupPending.mockReturnValue(false);
+    const lockfile: Lockfile = {
+      version: 2,
+      registries: [singleRegistry],
+      installed: {
+        'community:plugin:dev-workflow': {
+          type: 'plugin',
+          version: '1.0.0',
+          installedAt: '2026-01-01T00:00:00Z',
+          targets: ['claude-code'],
+          scope: 'project',
+          files: ['.claude/plugins/dev-workflow/setup.js'],
+          registryUrl: singleRegistry.url,
+          hasManifest: true,
+          scriptHashes: { postInstall: 'abc123def456' },
+        },
+      },
+    };
+    mockReadLockfile.mockReturnValue(lockfile);
+    const logSpy = vi.spyOn(console, 'log');
+
+    handleListCommand([]);
+
+    const rows = logSpy.mock.calls.map((c) => c[0] as string);
+    expect(rows.some((r) => r.includes('dev-workflow') && r.includes('[has scripts]'))).toBe(true);
+  });
+
+  it('does not append [has scripts] for an asset without scriptHashes', () => {
+    mockCheckSetupPending.mockReturnValue(false);
+    const lockfile: Lockfile = {
+      version: 2,
+      registries: [singleRegistry],
+      installed: {
+        'community:skill:git-commit': {
+          type: 'skill',
+          version: '1.0.0',
+          installedAt: '2026-01-01T00:00:00Z',
+          targets: ['claude-code'],
+          scope: 'project',
+          files: ['.claude/skills/git-commit/SKILL.md'],
+          registryUrl: singleRegistry.url,
+        },
+      },
+    };
+    mockReadLockfile.mockReturnValue(lockfile);
+    const logSpy = vi.spyOn(console, 'log');
+
+    handleListCommand([]);
+
+    const rows = logSpy.mock.calls.map((c) => c[0] as string);
+    expect(rows.every((r) => !r.includes('[has scripts]'))).toBe(true);
+  });
+});

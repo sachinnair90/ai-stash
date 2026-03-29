@@ -13,7 +13,10 @@ import {
   executeInstall,
   dryRunInstall,
   resolveForInstall,
+  syncFromLockfile,
+  hashScriptContent,
 } from '../engine/install.js';
+import { fetchScriptRisks } from '../registry/fetcher.js';
 
 let tmpDir: string;
 
@@ -258,5 +261,182 @@ describe('executeInstall', () => {
     expect(result.skippedFiles.length).toBeGreaterThan(0);
     const content = fs.readFileSync(path.join(skillDir, 'main.md'), 'utf-8');
     expect(content).toBe('Existing content');
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// hashScriptContent (task 12.1)
+// ──────────────────────────────────────────────────────────────────────
+
+describe('hashScriptContent', () => {
+  it('returns a 64-char hex sha256 string', () => {
+    const hash = hashScriptContent('console.log("hello");');
+    expect(hash).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('returns different hashes for different content', () => {
+    expect(hashScriptContent('version 1')).not.toBe(hashScriptContent('version 2'));
+  });
+
+  it('returns the same hash for identical content', () => {
+    const content = '// my script';
+    expect(hashScriptContent(content)).toBe(hashScriptContent(content));
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// Script hashes written to lockfile on install (tasks 12.1 / 13.1)
+// ──────────────────────────────────────────────────────────────────────
+
+describe('planInstall + executeInstall — script hashes', () => {
+  const scriptContent = '// setup script v1';
+
+  const pluginAsset: RegistryAsset = {
+    name: 'my-plugin',
+    type: 'plugin',
+    version: '1.0.0',
+    description: 'Plugin with setup script',
+    tags: ['test'],
+    targets: ['claude-code'],
+    files: ['plugins/my-plugin/setup.js'],
+    manifestUrl: 'https://example.com/plugins/my-plugin/manifest.json',
+    folder: 'plugins/my-plugin',
+    registryName: 'community',
+  };
+
+  beforeEach(() => {
+    // Override fetch for this describe block: manifest returns scripts, other URLs return script content
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(async (url: string) => {
+        if (url.includes('manifest.json')) {
+          return {
+            ok: true,
+            json: async () => ({
+              files: ['plugins/my-plugin/setup.js'],
+              scripts: { postInstall: 'plugins/my-plugin/setup.js' },
+            }),
+            text: async () => '',
+          };
+        }
+        return {
+          ok: true,
+          text: async () => scriptContent,
+          json: async () => ({}),
+        };
+      }),
+    );
+  });
+
+  it('plan includes scriptHashesForPlan computed from rawFiles', async () => {
+    const plan = await planInstall(
+      pluginAsset,
+      ['claude-code'],
+      'project',
+      tmpDir,
+      null,
+      'https://example.com/',
+    );
+
+    expect(plan.scriptHashesForPlan).toBeDefined();
+    expect(plan.scriptHashesForPlan!['postInstall']).toBe(hashScriptContent(scriptContent));
+  });
+
+  it('executeInstall writes scriptHashes to the lockfile entry', async () => {
+    const plan = await planInstall(
+      pluginAsset,
+      ['claude-code'],
+      'project',
+      tmpDir,
+      null,
+      'https://example.com/',
+    );
+
+    const lockfile: Lockfile = { ...emptyLockfile, installed: {} };
+    const lockfileKey = 'community:plugin:my-plugin';
+    await executeInstall(plan, {}, tmpDir, lockfile, lockfileKey, 'https://example.com');
+
+    const entry = lockfile.installed[lockfileKey];
+    expect(entry).toBeDefined();
+    expect(entry.scriptHashes).toBeDefined();
+    expect(entry.scriptHashes!.postInstall).toBe(hashScriptContent(scriptContent));
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// fetchScriptRisks — graceful null on failure (task 12.4)
+// ──────────────────────────────────────────────────────────────────────
+
+describe('fetchScriptRisks', () => {
+  it('returns null when fetch returns non-ok status', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: false, status: 404, statusText: 'Not Found' }),
+    );
+    const result = await fetchScriptRisks('https://example.com/', 'plugins/dev-workflow/SCRIPT_RISKS.md');
+    expect(result).toBeNull();
+  });
+
+  it('returns null when fetch throws a network error', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network failure')));
+    const result = await fetchScriptRisks('https://example.com/', 'plugins/dev-workflow/SCRIPT_RISKS.md');
+    expect(result).toBeNull();
+  });
+
+  it('returns text content on success', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: true, text: async () => '## Risks\nSome risk.' }),
+    );
+    const result = await fetchScriptRisks('https://example.com/', 'plugins/dev-workflow/SCRIPT_RISKS.md');
+    expect(result).toBe('## Risks\nSome risk.');
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// syncFromLockfile preserves riskAccepted (task 13.6)
+// ──────────────────────────────────────────────────────────────────────
+
+describe('syncFromLockfile — preserves riskAccepted', () => {
+  beforeEach(() => {
+    // Restore default fetch mock for sync tests
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        text: async () => '# Test Skill\nThis is the skill content.',
+        json: async () => ({}),
+      }),
+    );
+  });
+
+  it('preserves riskAccepted and riskAcceptedAt from the original lockfile entry', async () => {
+    const riskAcceptedAt = '2024-01-01T00:00:00.000Z';
+    const lockfileWithRisk: Lockfile = {
+      version: 2,
+      registries: [{ name: 'community', url: 'https://example.com' }],
+      installed: {
+        'community:skill:test-skill': {
+          type: 'skill',
+          version: '1.0.0',
+          installedAt: '2024-01-01T00:00:00.000Z',
+          targets: ['claude-code'],
+          scope: 'project',
+          // Use a relative path that doesn't exist in tmpDir → unsynced
+          files: ['.claude/skills/test-skill/main.md'],
+          registryUrl: 'https://example.com',
+          riskAccepted: true,
+          riskAcceptedAt,
+        },
+      },
+    };
+
+    const registryAssets: RegistryAsset[] = [sampleAsset];
+
+    await syncFromLockfile(lockfileWithRisk, registryAssets, tmpDir);
+
+    const entry = lockfileWithRisk.installed['community:skill:test-skill'];
+    expect(entry.riskAccepted).toBe(true);
+    expect(entry.riskAcceptedAt).toBe(riskAcceptedAt);
   });
 });

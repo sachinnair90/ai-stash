@@ -11,6 +11,7 @@ vi.mock('../lockfile/index.js', () => ({
 vi.mock('../engine/update.js', () => ({
   checkUpdates: vi.fn(),
   updateAssetFull: vi.fn(),
+  planUpdateFull: vi.fn(),
 }));
 
 vi.mock('../registry/client.js', () => ({
@@ -27,14 +28,21 @@ vi.mock('node:child_process', () => ({
   }),
 }));
 
+const mockCreateInterface = vi.fn();
+vi.mock('node:readline', () => ({
+  default: { createInterface: (...args: unknown[]) => mockCreateInterface(...args) },
+  createInterface: (...args: unknown[]) => mockCreateInterface(...args),
+}));
+
 import { readLockfile } from '../lockfile/index.js';
-import { checkUpdates, updateAssetFull } from '../engine/update.js';
+import { checkUpdates, updateAssetFull, planUpdateFull } from '../engine/update.js';
 import { getRegistries } from '../registry/client.js';
 import { handleUpdateCommand } from '../commands/update.js';
 
 const mockReadLockfile = vi.mocked(readLockfile);
 const mockCheckUpdates = vi.mocked(checkUpdates);
 const mockUpdateAssetFull = vi.mocked(updateAssetFull);
+const mockPlanUpdateFull = vi.mocked(planUpdateFull);
 const mockGetRegistries = vi.mocked(getRegistries);
 
 const singleRegistry = { name: 'community', url: 'https://example.com/registry.json' };
@@ -83,6 +91,8 @@ beforeEach(() => {
   });
   mockGetRegistries.mockResolvedValue({ assets: [mockAsset], warnings: [] });
   mockUpdateAssetFull.mockResolvedValue(updateResult);
+  // Default: no script changes detected
+  mockPlanUpdateFull.mockResolvedValue({ plan: {} as never, scriptChanged: false });
 });
 
 afterEach(() => {
@@ -221,5 +231,99 @@ describe('handleUpdateCommand — update all', () => {
     await expect(handleUpdateCommand(['--all'])).rejects.toThrow('process.exit(0)');
     expect(mockUpdateAssetFull).not.toHaveBeenCalled();
     expect(logSpy).toHaveBeenCalledWith('all assets are up to date');
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// update --all halts on scripted-change asset (task 13.7)
+// ──────────────────────────────────────────────────────────────────────
+
+describe('handleUpdateCommand — update all halts when script changed', () => {
+  it('exits 1 and names the scripted-change asset when --all encounters a script change', async () => {
+    mockReadLockfile.mockReturnValue(baseLockfile);
+    mockCheckUpdates.mockReturnValue([
+      {
+        name: 'git-commit',
+        lockfileKey: 'community:skill:git-commit',
+        installedVersion: '1.0.0',
+        latestVersion: '2.0.0',
+      },
+    ]);
+    // Simulate planUpdateFull detecting a script change — no files should be written
+    mockPlanUpdateFull.mockResolvedValue({ plan: {} as never, scriptChanged: true });
+
+    const errorSpy = vi.spyOn(console, 'error');
+
+    await expect(handleUpdateCommand(['--all'])).rejects.toThrow('process.exit(1)');
+    // updateAssetFull must NOT be called — files should not be written before user reviews
+    expect(mockUpdateAssetFull).not.toHaveBeenCalled();
+    // Error message should name the asset and suggest individual re-run
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('git-commit'),
+    );
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('script changed'),
+    );
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// update one — script-change disclaimer flow (task 5.7 / WARNING 3)
+// ──────────────────────────────────────────────────────────────────────
+
+describe('handleUpdateCommand — update one with script change', () => {
+  const scriptedPlanResult = {
+    plan: {
+      manifest: {
+        scripts: { postInstall: 'setup.js' },
+        scriptRisks: 'plugins/my-plugin/SCRIPT_RISKS.md',
+      },
+      scriptRisksContent: 'Run setup.js to configure.',
+    },
+    scriptChanged: true,
+  } as never;
+
+  it('shows disclaimer and prompts when single-asset update has script change', async () => {
+    mockReadLockfile.mockReturnValue(baseLockfile);
+    mockCheckUpdates.mockReturnValue([
+      { name: 'git-commit', lockfileKey: 'community:skill:git-commit', installedVersion: '1.0.0', latestVersion: '2.0.0' },
+    ]);
+    mockPlanUpdateFull.mockResolvedValue(scriptedPlanResult);
+    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    mockCreateInterface.mockReturnValue({
+      question: (_prompt: string, cb: (answer: string) => void) => cb('y'),
+      close: () => {},
+    });
+
+    await handleUpdateCommand(['skill', 'git-commit']);
+
+    const writtenText = stdoutSpy.mock.calls.map((c) => c[0] as string).join('');
+    expect(writtenText).toContain('Script changed');
+    expect(mockUpdateAssetFull).toHaveBeenCalledWith(
+      'community:skill:git-commit',
+      expect.any(String),
+      baseLockfile,
+      expect.any(Array),
+      undefined,
+      expect.objectContaining({ riskAccepted: true }),
+    );
+  });
+
+  it('aborts and does not update files when user declines the disclaimer', async () => {
+    mockReadLockfile.mockReturnValue(baseLockfile);
+    mockCheckUpdates.mockReturnValue([
+      { name: 'git-commit', lockfileKey: 'community:skill:git-commit', installedVersion: '1.0.0', latestVersion: '2.0.0' },
+    ]);
+    mockPlanUpdateFull.mockResolvedValue(scriptedPlanResult);
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    mockCreateInterface.mockReturnValue({
+      question: (_prompt: string, cb: (answer: string) => void) => cb('n'),
+      close: () => {},
+    });
+    const errorSpy = vi.spyOn(console, 'error');
+
+    await expect(handleUpdateCommand(['skill', 'git-commit'])).rejects.toThrow('process.exit(1)');
+    expect(mockUpdateAssetFull).not.toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalledWith('Update aborted.');
   });
 });

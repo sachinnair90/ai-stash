@@ -13,6 +13,9 @@ export interface InstalledAsset {
   registryUrl: string;
   hasManifest?: boolean;
   reconfigurationNeeded?: boolean;
+  scriptHashes?: { postInstall?: string; postUninstall?: string };
+  riskAccepted?: boolean;
+  riskAcceptedAt?: string;
 }
 
 export interface Lockfile {

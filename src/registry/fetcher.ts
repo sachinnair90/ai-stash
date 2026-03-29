@@ -71,3 +71,22 @@ export async function fetchManifest(baseUrl: string, folder: string, githubToken
 
   return data;
 }
+
+/**
+ * Fetch the SCRIPT_RISKS.md content for an asset manifest.
+ * Returns the file's text on success, or null if the fetch fails (network error or 4xx/5xx).
+ */
+export async function fetchScriptRisks(
+  baseUrl: string,
+  scriptRisksPath: string,
+  token?: string,
+): Promise<string | null> {
+  try {
+    const url = new URL(scriptRisksPath, baseUrl).href;
+    const response = await fetch(url, { headers: authHeaders(token) });
+    if (!response.ok) return null;
+    return response.text();
+  } catch {
+    return null;
+  }
+}

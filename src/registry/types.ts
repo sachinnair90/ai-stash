@@ -14,6 +14,8 @@ export interface RegistryAsset {
   folder?: string;
   /** Name of the source registry (populated after multi-registry merge) */
   registryName: string;
+  /** Pre-computed flag indicating this asset declares lifecycle scripts */
+  hasScripts?: boolean;
 }
 
 export interface UserConfigEntry {
@@ -30,6 +32,8 @@ export interface AssetManifest {
   };
   configuredFiles?: string[];
   configStable?: boolean;
+  /** Path to SCRIPT_RISKS.md relative to the registry base, fetched on-demand during disclaimer */
+  scriptRisks?: string;
 }
 
 /** Normalised flat form used internally throughout the engine and UI */

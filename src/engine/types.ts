@@ -17,6 +17,9 @@ export interface InstallPlan {
   files: Record<string, string>;
   conflicts: FileConflict[];
   manifest?: AssetManifest;
+  scriptRisksContent?: string;
+  scriptHashesForPlan?: Record<string, string>;
+  scriptChanged?: boolean;
 }
 
 export interface InstallResult {
@@ -25,4 +28,6 @@ export interface InstallResult {
   skippedFiles: string[];
   lockfileEntry: InstalledAsset;
   scriptNotice?: string;
+  scriptChanged?: boolean;
+  plan?: InstallPlan;
 }

@@ -29,9 +29,11 @@ export function handleListCommand(_args: string[]): void {
       status = 'reconfiguration needed';
     }
 
+    const hasScripts = asset.scriptHashes && Object.keys(asset.scriptHashes).length > 0;
+
     rows.push({
       type: asset.type,
-      name,
+      name: hasScripts ? `${name} [has scripts]` : name,
       version: asset.version,
       scope: asset.scope,
       registry,

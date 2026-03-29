@@ -1,11 +1,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import type { RegistryAsset, AssetManifest } from '../registry/types.js';
 import { getUnsyncedAssets } from '../lockfile/index.js';
 import type { Lockfile, InstalledAsset, RegistryConfig } from '../lockfile/types.js';
 import type { AssetType } from '../adapters/types.js';
 import { getAdapter } from '../adapters/index.js';
-import { fetchAssetFile, fetchManifest } from '../registry/fetcher.js';
+import { fetchAssetFile, fetchManifest, fetchScriptRisks } from '../registry/fetcher.js';
 import { writeLockfile } from '../lockfile/writer.js';
 import { collectUserConfig, substituteUserConfig } from './user-config.js';
 import type {
@@ -36,6 +37,13 @@ export interface InstallFileResult {
   success: boolean;
   suffixApplied?: { originalName: string; suffixedName: string; conflictingRegistry: string };
   scriptNotice?: string;
+}
+
+/**
+ * Compute sha256 hex hash of script content for change detection.
+ */
+export function hashScriptContent(content: string): string {
+  return crypto.createHash('sha256').update(content).digest('hex');
 }
 
 /**
@@ -109,9 +117,15 @@ export async function planInstall(
     filesToFetch = asset.files;
   }
 
+  // Fetch SCRIPT_RISKS.md content if declared in manifest
+  let scriptRisksContent: string | undefined;
+  if (manifest?.scriptRisks) {
+    const content = await fetchScriptRisks(registryBaseUrl, manifest.scriptRisks, githubToken);
+    scriptRisksContent = content ?? undefined;
+  }
+
   // Fetch all asset files from registry
-  const rawFiles: Record<string, string> = {};
-  for (const filePath of filesToFetch) {
+  const rawFiles: Record<string, string> = {};  for (const filePath of filesToFetch) {
     rawFiles[filePath] = await fetchAssetFile(registryBaseUrl, filePath, githubToken);
   }
 
@@ -162,6 +176,21 @@ export async function planInstall(
     }
   }
 
+  // Compute script hashes from already-fetched rawFiles (no extra network requests)
+  const scriptHashesForPlan: Record<string, string> = {};
+  if (manifest?.scripts) {
+    for (const [scriptKey, scriptFile] of Object.entries(manifest.scripts) as [string, string | undefined][]) {
+      if (!scriptFile) continue;
+      // rawFiles is keyed by relative path as declared in manifest.files
+      // Scripts may be in a subfolder: find by basename or full path
+      const content = rawFiles[scriptFile]
+        ?? rawFiles[Object.keys(rawFiles).find((k) => k.endsWith(scriptFile) || k === scriptFile) ?? ''];
+      if (content !== undefined) {
+        scriptHashesForPlan[scriptKey] = hashScriptContent(content);
+      }
+    }
+  }
+
   return {
     asset,
     targets,
@@ -169,6 +198,8 @@ export async function planInstall(
     files: transformedFiles,
     conflicts,
     manifest,
+    scriptRisksContent,
+    scriptHashesForPlan: Object.keys(scriptHashesForPlan).length > 0 ? scriptHashesForPlan : undefined,
   };
 }
 
@@ -182,7 +213,7 @@ export async function executeInstall(
   lockfile: Lockfile,
   lockfileKey?: string,
   registryUrl?: string,
-  options?: { skipConfiguredFiles?: boolean },
+  options?: { skipConfiguredFiles?: boolean; riskAccepted?: boolean; riskAcceptedAt?: string },
 ): Promise<InstallResult> {
   const installedFiles: string[] = [];
   const skippedFiles: string[] = [];
@@ -267,6 +298,23 @@ export async function executeInstall(
   // Set hasManifest for folder-based assets (task 5.5)
   if (plan.manifest) {
     lockfileEntry.hasManifest = true;
+  }
+
+  // Write risk acceptance state when provided
+  if (options?.riskAccepted) {
+    lockfileEntry.riskAccepted = true;
+    lockfileEntry.riskAcceptedAt = options.riskAcceptedAt ?? new Date().toISOString();
+  }
+
+  // Write script hashes from the plan
+  if (plan.scriptHashesForPlan && Object.keys(plan.scriptHashesForPlan).length > 0) {
+    lockfileEntry.scriptHashes = {};
+    if (plan.scriptHashesForPlan['postInstall']) {
+      lockfileEntry.scriptHashes.postInstall = plan.scriptHashesForPlan['postInstall'];
+    }
+    if (plan.scriptHashesForPlan['postUninstall']) {
+      lockfileEntry.scriptHashes.postUninstall = plan.scriptHashesForPlan['postUninstall'];
+    }
   }
 
   const key = lockfileKey ?? plan.asset.name;
@@ -372,7 +420,7 @@ export async function installAssetFull(
   registryName: string,
   githubToken?: string,
   onProgress?: (conflicts: FileConflict[]) => Promise<Record<string, ConflictResolution>>,
-  options?: { skipConfiguredFiles?: boolean },
+  options?: { skipConfiguredFiles?: boolean; riskAccepted?: boolean; riskAcceptedAt?: string },
 ): Promise<InstallResult> {
   const { resolvedAsset, lockfileKey } = resolveForInstall(
     asset,
@@ -413,8 +461,6 @@ export async function installAssetFull(
   }
 
   const result = await executeInstall(plan, resolutions, projectRoot, lockfile, lockfileKey, registryUrl, options);
-
-  // Clear reconfigurationNeeded when user re-installs an asset (task 7.4)
   if (result.lockfileEntry.reconfigurationNeeded) {
     delete result.lockfileEntry.reconfigurationNeeded;
     lockfile.installed[lockfileKey] = result.lockfileEntry;
@@ -453,7 +499,7 @@ export async function dryRunInstall(
  */
 export async function installAsset(
   asset: RegistryAsset,
-  options: InstallOptions,
+  options: InstallOptions & { riskAccepted?: boolean; riskAcceptedAt?: string },
   onProgress?: (status: InstallFileStatus) => void,
 ): Promise<InstallFileResult> {
   const { scope, targets, projectRoot, registryBaseUrl, registryName, githubToken } = options;
@@ -516,7 +562,10 @@ export async function installAsset(
       resolutions[conflict.filePath] = 'overwrite';
     }
 
-    const result = await executeInstall(plan, resolutions, projectRoot, lockfile, lockfileKey, registryBaseUrl);
+    const result = await executeInstall(plan, resolutions, projectRoot, lockfile, lockfileKey, registryBaseUrl, {
+      riskAccepted: options.riskAccepted,
+      riskAcceptedAt: options.riskAcceptedAt,
+    });
 
     // Map to TUI-compatible result
     const resultStatuses: InstallFileStatus[] = result.installedFiles.map((f) => ({
@@ -606,7 +655,11 @@ export async function syncFromLockfile(
         lockfileEntry.registryUrl,
         githubToken,
       );
-      await executeInstall(plan, {}, projectRoot, lockfile, lockfileKey, lockfileEntry.registryUrl);
+      // Preserve prior risk acceptance state when re-syncing (task 9.1)
+      await executeInstall(plan, {}, projectRoot, lockfile, lockfileKey, lockfileEntry.registryUrl, {
+        riskAccepted: lockfileEntry.riskAccepted,
+        riskAcceptedAt: lockfileEntry.riskAcceptedAt,
+      });
       result.installed.push(lockfileKey);
       onProgress?.(lockfileKey, 'done');
     } catch {

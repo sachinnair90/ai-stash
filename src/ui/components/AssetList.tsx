@@ -75,6 +75,7 @@ export function AssetList({
         }
 
         const checkbox = isMultiSelected ? '[×] ' : '[ ] ';
+        const scriptBadge = asset.hasScripts ? <Text color="magenta">⚙ </Text> : null;
         const description = asset.description.length > 50
           ? asset.description.slice(0, 47) + '...'
           : asset.description;
@@ -86,6 +87,7 @@ export function AssetList({
               <Text color={statusColor}>{statusIcon}</Text>
               <Text color={color} bold>[{asset.type}]</Text>
               <Text> {asset.name} </Text>
+              {scriptBadge}
               <Text dimColor>{description} </Text>
               <Text color="green">v{asset.version}</Text>
             </Text>

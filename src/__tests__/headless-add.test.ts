@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Lockfile } from '../lockfile/types.js';
 import type { RegistryAsset } from '../registry/types.js';
-import type { InstallResult } from '../engine/types.js';
+import type { InstallResult, InstallPlan } from '../engine/types.js';
 
 vi.mock('../lockfile/index.js', () => ({
   readLockfile: vi.fn(),
@@ -10,7 +10,9 @@ vi.mock('../lockfile/index.js', () => ({
 }));
 
 vi.mock('../engine/install.js', () => ({
-  installAssetFull: vi.fn(),
+  planInstall: vi.fn(),
+  executeInstall: vi.fn(),
+  resolveForInstall: vi.fn(),
 }));
 
 vi.mock('../registry/client.js', () => ({
@@ -27,13 +29,22 @@ vi.mock('node:child_process', () => ({
   }),
 }));
 
+const mockCreateInterface = vi.fn();
+vi.mock('node:readline', () => ({
+  default: { createInterface: (...args: unknown[]) => mockCreateInterface(...args) },
+  createInterface: (...args: unknown[]) => mockCreateInterface(...args),
+}));
+
 import { readLockfile } from '../lockfile/index.js';
-import { installAssetFull } from '../engine/install.js';
+import { planInstall, executeInstall, resolveForInstall } from '../engine/install.js';
 import { getRegistries } from '../registry/client.js';
 import { handleAddCommand } from '../commands/add.js';
 
 const mockReadLockfile = vi.mocked(readLockfile);
-const mockInstallAssetFull = vi.mocked(installAssetFull);
+const mockPlanInstall = vi.mocked(planInstall);
+const mockExecuteInstall = vi.mocked(executeInstall);
+const mockResolveForInstall = vi.mocked(resolveForInstall);
+
 const mockGetRegistries = vi.mocked(getRegistries);
 
 const singleRegistry = { name: 'community', url: 'https://example.com/registry.json' };
@@ -71,13 +82,29 @@ const installResult: InstallResult = {
   },
 };
 
+/** Minimal plan returned by the mock — no scripts, so no disclaimer gate. */
+const basePlan: InstallPlan = {
+  asset: mockAsset,
+  targets: ['claude-code'],
+  scope: 'project',
+  files: { '.claude/skills/git-commit/SKILL.md': '# skill' },
+  conflicts: [],
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.spyOn(process, 'exit').mockImplementation((_code?: number | string | null | undefined): never => {
     throw new Error(`process.exit(${_code})`);
   });
   mockGetRegistries.mockResolvedValue({ assets: [mockAsset], warnings: [] });
-  mockInstallAssetFull.mockResolvedValue(installResult);
+  mockResolveForInstall.mockReturnValue({
+    resolvedAsset: mockAsset,
+    lockfileKey: 'community:skill:git-commit',
+    suffixApplied: false,
+    conflictingRegistry: null,
+  });
+  mockPlanInstall.mockResolvedValue(basePlan);
+  mockExecuteInstall.mockResolvedValue(installResult);
 });
 
 afterEach(() => {
@@ -91,16 +118,7 @@ describe('handleAddCommand — add from single registry', () => {
 
     await handleAddCommand(['skill', 'git-commit']);
 
-    expect(mockInstallAssetFull).toHaveBeenCalledWith(
-      mockAsset,
-      mockAsset.targets,
-      'project',
-      '/test/root',
-      singleRegistry.url,
-      expect.any(Object),
-      singleRegistry.name,
-      undefined,
-    );
+    expect(mockExecuteInstall).toHaveBeenCalled();
     expect(logSpy).toHaveBeenCalledWith(
       expect.stringContaining("Installed skill 'git-commit' (v1.0.0) [project]"),
     );
@@ -148,7 +166,7 @@ describe('handleAddCommand — already installed', () => {
     const logSpy = vi.spyOn(console, 'log');
 
     await expect(handleAddCommand(['skill', 'git-commit'])).rejects.toThrow('process.exit(0)');
-    expect(mockInstallAssetFull).not.toHaveBeenCalled();
+    expect(mockExecuteInstall).not.toHaveBeenCalled();
     expect(logSpy).toHaveBeenCalledWith('already installed (1.0.0), nothing to do');
   });
 
@@ -172,7 +190,7 @@ describe('handleAddCommand — already installed', () => {
     const logSpy = vi.spyOn(console, 'log');
 
     await expect(handleAddCommand(['skill', 'git-commit'])).rejects.toThrow('process.exit(0)');
-    expect(mockInstallAssetFull).not.toHaveBeenCalled();
+    expect(mockExecuteInstall).not.toHaveBeenCalled();
     expect(logSpy).toHaveBeenCalledWith("already installed (0.9.0), use 'update' to upgrade");
   });
 });
@@ -183,7 +201,7 @@ describe('handleAddCommand — no registries configured', () => {
     const errorSpy = vi.spyOn(console, 'error');
 
     await expect(handleAddCommand(['skill', 'git-commit'])).rejects.toThrow('process.exit(1)');
-    expect(mockInstallAssetFull).not.toHaveBeenCalled();
+    expect(mockExecuteInstall).not.toHaveBeenCalled();
     expect(errorSpy).toHaveBeenCalledWith(
       expect.stringContaining('no registries configured'),
     );
@@ -197,7 +215,7 @@ describe('handleAddCommand — asset not found', () => {
     const errorSpy = vi.spyOn(console, 'error');
 
     await expect(handleAddCommand(['skill', 'nonexistent'])).rejects.toThrow('process.exit(1)');
-    expect(mockInstallAssetFull).not.toHaveBeenCalled();
+    expect(mockExecuteInstall).not.toHaveBeenCalled();
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("skill 'nonexistent' not found in registry 'community'"));
   });
 });
@@ -238,11 +256,11 @@ describe('handleAddCommand — --scope flag', () => {
 
     await handleAddCommand(['skill', 'git-commit', '--scope', 'global']);
 
-    expect(mockInstallAssetFull).toHaveBeenCalledWith(
+    // planInstall should be called with 'global' scope
+    expect(mockPlanInstall).toHaveBeenCalledWith(
       expect.any(Object),
       expect.any(Array),
       'global',
-      expect.any(String),
       expect.any(String),
       expect.any(Object),
       expect.any(String),
@@ -257,15 +275,148 @@ describe('handleAddCommand — --target flag', () => {
 
     await handleAddCommand(['skill', 'git-commit', '--target', 'claude-code']);
 
-    expect(mockInstallAssetFull).toHaveBeenCalledWith(
+    // planInstall should be called with the specified targets
+    expect(mockPlanInstall).toHaveBeenCalledWith(
       expect.any(Object),
       ['claude-code'],
-      expect.any(String),
       expect.any(String),
       expect.any(String),
       expect.any(Object),
       expect.any(String),
       undefined,
     );
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// Script disclaimer tests (tasks 12.2 / 13.2)
+// ──────────────────────────────────────────────────────────────────────
+
+import { GENERIC_SCRIPT_RISKS } from '../engine/script-risks.js';
+
+/** Plan with a postInstall script declared. */
+const scriptedPlan: InstallPlan = {
+  ...basePlan,
+  manifest: {
+    files: ['setup.js'],
+    scripts: { postInstall: 'setup.js' },
+  },
+  scriptRisksContent: 'Author docs: run setup.js',
+};
+
+describe('handleAddCommand — scripted asset disclaimer', () => {
+  it('shows disclaimer and prompts when asset has scripts', async () => {
+    mockReadLockfile.mockReturnValue(baseLockfile);
+    mockPlanInstall.mockResolvedValue(scriptedPlan);
+
+    // Simulate user typing 'y' to accept
+    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    mockCreateInterface.mockReturnValue({
+      question: (_prompt: string, cb: (answer: string) => void) => cb('y'),
+      close: () => {},
+    });
+
+    await handleAddCommand(['skill', 'git-commit']);
+
+    // Disclaimer text contains GENERIC_SCRIPT_RISKS content
+    const writtenText = stdoutSpy.mock.calls.map((c) => c[0] as string).join('');
+    expect(writtenText).toContain(GENERIC_SCRIPT_RISKS.slice(0, 30));
+    expect(mockExecuteInstall).toHaveBeenCalled();
+  });
+
+  it('aborts with exit 1 when user declines the disclaimer', async () => {
+    mockReadLockfile.mockReturnValue(baseLockfile);
+    mockPlanInstall.mockResolvedValue(scriptedPlan);
+
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    mockCreateInterface.mockReturnValue({
+      question: (_prompt: string, cb: (answer: string) => void) => cb('n'),
+      close: () => {},
+    });
+    const errorSpy = vi.spyOn(console, 'error');
+
+    await expect(handleAddCommand(['skill', 'git-commit'])).rejects.toThrow('process.exit(1)');
+    expect(mockExecuteInstall).not.toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalledWith('Installation aborted.');
+  });
+
+  it('bypasses prompt and installs when --accept-script-risks flag is present', async () => {
+    mockReadLockfile.mockReturnValue(baseLockfile);
+    mockPlanInstall.mockResolvedValue(scriptedPlan);
+
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+
+    await handleAddCommand(['skill', 'git-commit', '--accept-script-risks']);
+
+    // readline should not have been called — no interactive prompt
+    expect(mockCreateInterface).not.toHaveBeenCalled();
+    expect(mockExecuteInstall).toHaveBeenCalled();
+    // riskAccepted should be true in the options passed to executeInstall
+    const callArgs = mockExecuteInstall.mock.calls[0];
+    expect(callArgs[6]).toMatchObject({ riskAccepted: true });
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// buildScriptDisclaimerText — GENERIC_SCRIPT_RISKS appears first (task 13.8)
+// ──────────────────────────────────────────────────────────────────────
+
+import { buildScriptDisclaimerText } from '../engine/script-risks.js';
+
+describe('buildScriptDisclaimerText', () => {
+  it('places GENERIC_SCRIPT_RISKS before any author content', () => {
+    const text = buildScriptDisclaimerText(
+      'my-plugin',
+      ['postInstall: setup.js'],
+      '## Author Docs\nThis is what the script does.',
+      true,  // hasDeclaredScriptRisks
+      true,  // hasPostInstall
+      false,
+    );
+
+    const genericPos = text.indexOf(GENERIC_SCRIPT_RISKS.slice(0, 30));
+    const authorPos = text.indexOf('Author Docs');
+    expect(genericPos).toBeGreaterThanOrEqual(0);
+    expect(authorPos).toBeGreaterThan(genericPos);
+  });
+
+  it('includes generic risks even when author docs are unavailable (null)', () => {
+    const text = buildScriptDisclaimerText(
+      'my-plugin',
+      ['postInstall: setup.js'],
+      undefined,
+      true,  // hasDeclaredScriptRisks — declared but fetch failed
+      true,  // hasPostInstall
+      false,
+    );
+
+    expect(text).toContain(GENERIC_SCRIPT_RISKS.slice(0, 30));
+    expect(text).toContain('unavailable');
+  });
+
+  it('adds no-cleanup warning when postInstall declared without postUninstall', () => {
+    const text = buildScriptDisclaimerText(
+      'my-plugin',
+      ['postInstall: setup.js'],
+      undefined,
+      false,  // hasDeclaredScriptRisks
+      true,   // hasPostInstall
+      false,
+    );
+
+    expect(text).toContain('No cleanup script');
+  });
+
+  it('omits no-cleanup warning when postUninstall is present', () => {
+    const text = buildScriptDisclaimerText(
+      'my-plugin',
+      ['postInstall: setup.js', 'postUninstall: teardown.js'],
+      undefined,
+      false,  // hasDeclaredScriptRisks
+      true,   // hasPostInstall
+      true,
+    );
+
+    expect(text).not.toContain('No cleanup script');
   });
 });

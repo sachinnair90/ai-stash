@@ -65,3 +65,26 @@ npx ai-stash
 ## File path note
 
 Asset `files` paths are relative to the registry root. The engine resolves fetch URLs via `new URL(filePath, registryUrl)`, so files at `skills/git-commit/SKILL.md` are served at the correct path when the registry is hosted. For standard assets (skills, agents, instructions, commands, hooks), the basename is used for the install destination — `SKILL.md` installs to `.claude/skills/git-commit/SKILL.md`. For plugin assets, subpaths under `plugins/{name}/` are preserved at the install destination.
+
+## Script Risk Model
+
+Assets that include lifecycle scripts (declared in `scripts.postInstall` / `scripts.postUninstall` in their `manifest.json`) require explicit developer acceptance before installation.
+
+**What ai-stash guarantees:**
+- Scripts are **never executed automatically** — they are surfaced for manual review only
+- A mandatory risk disclaimer is shown and must be explicitly accepted before install proceeds
+- Script content is hashed at install time; if the hash changes on update, re-acceptance is required
+
+**What ai-stash does NOT guarantee:**
+- Script analysis, sandboxing, or safety validation
+- Rollback of script side effects on failure
+- Cross-platform compatibility of scripts
+
+**Trust chain:**
+`Registry` → (reviews author submission) → `Author` → `SCRIPT_RISKS.md` → `Developer acceptance`
+
+**Author obligations for scripted assets:**
+1. Provide a `SCRIPT_RISKS.md` documenting what the script installs, modifies, and how to undo
+2. Declare `postUninstall` or document manual cleanup steps in `SCRIPT_RISKS.md`
+3. Set `"hasScripts": true` in the `registry.json` entry for the asset
+4. Set `"scriptRisks": "path/to/SCRIPT_RISKS.md"` in `manifest.json` pointing to the documentation file

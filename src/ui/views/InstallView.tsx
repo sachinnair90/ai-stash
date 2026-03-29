@@ -2,9 +2,12 @@ import React, { useState, useCallback } from 'react';
 import { Box, Text, useInput } from 'ink';
 import Spinner from 'ink-spinner';
 import type { RegistryAsset } from '../../registry/types.js';
-import { installAsset, type InstallFileStatus } from '../../engine/install.js';
+import { installAsset, planInstall, type InstallFileStatus } from '../../engine/install.js';
+import { ScriptRiskDisclaimer } from '../components/ScriptRiskDisclaimer.js';
+import type { InstallPlan } from '../../engine/types.js';
+import { readLockfile } from '../../lockfile/index.js';
 
-type Step = 'scope' | 'targets' | 'progress' | 'conflict' | 'done';
+type Step = 'scope' | 'targets' | 'disclaimer' | 'progress' | 'conflict' | 'done';
 
 interface InstallViewProps {
   assets: RegistryAsset[];
@@ -35,8 +38,43 @@ export function InstallView({ assets, onDone, onCancel, registryBaseUrl, registr
   const [conflictFile, setConflictFile] = useState<string | null>(null);
   const [suffixNotices, setSuffixNotices] = useState<SuffixNotice[]>([]);
   const [scriptNotices, setScriptNotices] = useState<string[]>([]);
+  const [pendingPlans, setPendingPlans] = useState<InstallPlan[]>([]);
+  const [disclaimerIndex, setDisclaimerIndex] = useState(0);
+  const [acceptedRisks, setAcceptedRisks] = useState<Map<string, { riskAccepted: boolean; riskAcceptedAt: string }>>(new Map());
 
-  const runInstall = useCallback(async () => {
+  const checkDisclaimers = useCallback(async () => {
+    // Pre-plan all assets to detect which have scripts
+    const lockfile = readLockfile(projectRoot);
+    const plans: InstallPlan[] = [];
+    for (const asset of assets) {
+      try {
+        const plan = await planInstall(
+          asset,
+          Array.from(selectedTargets),
+          scopes[scopeIndex],
+          projectRoot,
+          lockfile,
+          registryBaseUrl,
+          githubToken,
+        );
+        if (plan.manifest?.scripts) {
+          plans.push(plan);
+        }
+      } catch {
+        // Ignore plan errors here; they'll surface during actual install
+      }
+    }
+    if (plans.length === 0) {
+      // No disclaimers needed — go straight to install
+      void runInstall(new Map());
+    } else {
+      setPendingPlans(plans);
+      setDisclaimerIndex(0);
+      setStep('disclaimer');
+    }
+  }, [assets, scopeIndex, selectedTargets, registryBaseUrl, projectRoot, githubToken]);
+
+  const runInstall = useCallback(async (risks: Map<string, { riskAccepted: boolean; riskAcceptedAt: string }>) => {
     setStep('progress');
     setInstalling(true);
 
@@ -47,6 +85,7 @@ export function InstallView({ assets, onDone, onCancel, registryBaseUrl, registr
       }));
       setResults((prev) => new Map(prev).set(asset.name, fileStatuses));
 
+      const riskInfo = risks.get(asset.name);
       const result = await installAsset(asset, {
         scope: scopes[scopeIndex],
         targets: Array.from(selectedTargets),
@@ -54,6 +93,8 @@ export function InstallView({ assets, onDone, onCancel, registryBaseUrl, registr
         registryBaseUrl,
         registryName,
         githubToken,
+        riskAccepted: riskInfo?.riskAccepted,
+        riskAcceptedAt: riskInfo?.riskAcceptedAt,
       }, (status) => {
         setResults((prev) => {
           const next = new Map(prev);
@@ -120,9 +161,13 @@ export function InstallView({ assets, onDone, onCancel, registryBaseUrl, registr
         });
       }
       if (key.return && selectedTargets.size > 0) {
-        void runInstall();
+        void checkDisclaimers();
       }
       return;
+    }
+
+    if (step === 'disclaimer') {
+      return; // handled by ScriptRiskDisclaimer component
     }
 
     if (step === 'conflict') {
@@ -178,6 +223,42 @@ export function InstallView({ assets, onDone, onCancel, registryBaseUrl, registr
           ))}
         </Box>
         <Box marginTop={1}><Text dimColor>Space toggle, Enter confirm, Escape cancel</Text></Box>
+      </Box>
+    );
+  }
+
+  if (step === 'disclaimer' && pendingPlans.length > 0) {
+    const plan = pendingPlans[disclaimerIndex];
+    const scripts = plan.manifest!.scripts!;
+    const scriptNames: string[] = [];
+    if (scripts.postInstall) scriptNames.push(`postInstall: ${scripts.postInstall}`);
+    if (scripts.postUninstall) scriptNames.push(`postUninstall: ${scripts.postUninstall}`);
+
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Text dimColor>Disclaimer {disclaimerIndex + 1}/{pendingPlans.length}</Text>
+        <ScriptRiskDisclaimer
+          assetName={plan.asset.name}
+          scripts={scriptNames}
+          scriptRisksContent={plan.scriptRisksContent}
+          onAccept={() => {
+            const ts = new Date().toISOString();
+            setAcceptedRisks((prev) => {
+              const next = new Map(prev);
+              next.set(plan.asset.name, { riskAccepted: true, riskAcceptedAt: ts });
+              return next;
+            });
+            if (disclaimerIndex + 1 < pendingPlans.length) {
+              setDisclaimerIndex((i) => i + 1);
+            } else {
+              // All disclaimers accepted — proceed to install with accumulated accepted state
+              const finalRisks = new Map(acceptedRisks);
+              finalRisks.set(plan.asset.name, { riskAccepted: true, riskAcceptedAt: ts });
+              void runInstall(finalRisks);
+            }
+          }}
+          onCancel={onCancel}
+        />
       </Box>
     );
   }
