@@ -16,7 +16,8 @@ interface RegistriesViewProps {
 type Step = 'list' | 'add-url' | 'add-name' | 'confirm-remove';
 
 export function RegistriesView({ lockfile, projectRoot, assets, onDone, onCancel }: RegistriesViewProps) {
-  const registries = lockfile?.registries ?? [];
+  // Local copy of registries so add/remove stays in-view without kicking back to browse
+  const [localRegistries, setLocalRegistries] = useState<RegistryConfig[]>(lockfile?.registries ?? []);
   const [step, setStep] = useState<Step>('list');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [newUrl, setNewUrl] = useState('');
@@ -31,43 +32,46 @@ export function RegistriesView({ lockfile, projectRoot, assets, onDone, onCancel
     const url = newUrl.trim();
     const name = newName.trim();
     if (!url || !name) { setError('URL and name are required'); return; }
-    if (lockfile.registries.find((r) => r.name === name)) {
+    if (localRegistries.find((r) => r.name === name)) {
       setError(`Registry named "${name}" already exists`);
       return;
     }
-    if (lockfile.registries.find((r) => r.url === url)) {
+    if (localRegistries.find((r) => r.url === url)) {
       setError(`Registry URL "${url}" already configured`);
       return;
     }
-    const updated: Lockfile = { ...lockfile, registries: [...lockfile.registries, { name, url }] };
+    const updated: Lockfile = { ...lockfile, registries: [...localRegistries, { name, url }] };
     writeLockfile(projectRoot, updated);
+    setLocalRegistries(updated.registries);
     setNewUrl('');
     setNewName('');
     setError(null);
     setStep('list');
-    onDone();
-  }, [lockfile, projectRoot, newUrl, newName, onDone]);
+    // Stay in registries view — parent refreshes when user Escapes
+  }, [lockfile, localRegistries, projectRoot, newUrl, newName]);
 
   const handleRemove = useCallback(() => {
     if (!lockfile) return;
-    const reg = registries[selectedIndex];
+    const reg = localRegistries[selectedIndex];
     if (!reg) return;
     const updated: Lockfile = {
       ...lockfile,
-      registries: lockfile.registries.filter((r) => r.name !== reg.name),
+      registries: localRegistries.filter((r) => r.name !== reg.name),
     };
     writeLockfile(projectRoot, updated);
+    setLocalRegistries(updated.registries);
+    setSelectedIndex((i) => Math.min(i, Math.max(0, updated.registries.length - 1)));
     setStep('list');
-    onDone();
-  }, [lockfile, projectRoot, registries, selectedIndex, onDone]);
+    // Stay in registries view — parent refreshes when user Escapes
+  }, [lockfile, localRegistries, projectRoot, selectedIndex]);
 
   useInput((input, key) => {
     if (step === 'list') {
-      if (key.escape) { onCancel(); return; }
+      if (key.escape) { onDone(); return; }
       if (key.upArrow) setSelectedIndex((i) => Math.max(0, i - 1));
-      if (key.downArrow) setSelectedIndex((i) => Math.min(registries.length - 1, i + 1));
+      if (key.downArrow) setSelectedIndex((i) => Math.min(localRegistries.length - 1, i + 1));
       if (input === 'a') { setStep('add-url'); setError(null); return; }
-      if (input === 'd' && registries.length > 0) { setStep('confirm-remove'); return; }
+      if (input === 'd' && localRegistries.length > 0) { setStep('confirm-remove'); return; }
       return;
     }
 
@@ -124,7 +128,7 @@ export function RegistriesView({ lockfile, projectRoot, assets, onDone, onCancel
   }
 
   if (step === 'confirm-remove') {
-    const reg = registries[selectedIndex];
+    const reg = localRegistries[selectedIndex];
     const count = reg ? assetCountFor(reg.name) : 0;
     return (
       <Box flexDirection="column" padding={1}>
@@ -147,10 +151,10 @@ export function RegistriesView({ lockfile, projectRoot, assets, onDone, onCancel
     <Box flexDirection="column" padding={1}>
       <Text bold>Registries</Text>
       <Box marginTop={1} flexDirection="column">
-        {registries.length === 0 ? (
+        {localRegistries.length === 0 ? (
           <Text dimColor>No registries configured. Press a to add one.</Text>
         ) : (
-          registries.map((reg, index) => (
+          localRegistries.map((reg, index) => (
             <Box key={reg.name}>
               <Text inverse={index === selectedIndex}>
                 <Text> {reg.name} </Text>

@@ -133,13 +133,13 @@ export function App() {
     // Global keys that work in every view
     if (input === 'q') { exit(); return; }
     if (input === '?') { setShowHelp(true); return; }
+    if (input === 'R') { setView('registries'); return; }
     if (key.escape && view !== 'browse') { setView('browse'); return; }
 
     if (view !== 'browse') return;
 
     if (input === 'u') { setView('updates'); return; }
     if (input === 'l') { setView('installed'); return; }
-    if (input === 'R') { setView('registries'); return; }
     if (input === 's' && unsyncedCount > 0) { setView('sync'); return; }
     if (input === '/') { setSearchActive(true); return; }
 
@@ -221,9 +221,17 @@ export function App() {
           projectRoot={projectRoot}
           assets={assets}
           onDone={() => {
-            refreshLockfile();
-            void loadRegistry(readLockfile(projectRoot) ?? undefined);
-            setView('browse');
+            // User is leaving the registries view — reload from disk and navigate
+            const lf = readLockfile(projectRoot);
+            if (!lf || lf.registries.length === 0) {
+              // All registries were removed; go to setup to add a new one
+              setLockfile(lf);
+              setLoadState('setup');
+            } else {
+              setView('browse');
+              setLoadState('loading');
+              void loadRegistry(lf);
+            }
           }}
           onCancel={() => setView('browse')}
         />

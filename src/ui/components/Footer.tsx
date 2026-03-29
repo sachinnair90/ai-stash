@@ -12,6 +12,7 @@ export function Footer({ unsyncedCount }: FooterProps) {
       <Box marginRight={2}><Text bold color="cyan">i</Text><Text dimColor> install</Text></Box>
       <Box marginRight={2}><Text bold color="cyan">u</Text><Text dimColor> updates</Text></Box>
       <Box marginRight={2}><Text bold color="cyan">l</Text><Text dimColor> installed</Text></Box>
+      <Box marginRight={2}><Text bold color="cyan">R</Text><Text dimColor> registries</Text></Box>
       {unsyncedCount !== undefined && unsyncedCount > 0 && (
         <Box marginRight={2}>
           <Text bold color="yellow">s</Text>
