@@ -1,8 +1,11 @@
-import type { RegistryAsset } from '../registry/types.js';
+import fs from 'node:fs';
+import path from 'node:path';
+import type { RegistryAsset, AssetManifest } from '../registry/types.js';
 import type { Lockfile } from '../lockfile/types.js';
 import { getAdapter } from '../adapters/registry.js';
 import { writeLockfile } from '../lockfile/writer.js';
-import { installAssetFull } from './install.js';
+import { installAssetFull, buildScriptNotice } from './install.js';
+import { fetchManifest } from '../registry/fetcher.js';
 import type { InstallResult } from './types.js';
 
 // TUI-compatible types
@@ -17,6 +20,7 @@ export interface RemoveResult {
   asset: string;
   filesRemoved: string[];
   success: boolean;
+  scriptNotice?: string;
 }
 
 export interface UpdateCheck {
@@ -68,6 +72,8 @@ export function checkUpdates(
 
 /**
  * Update a single asset to the latest registry version.
+ * For folder-based assets: fetches new manifest, preserves configuredFiles,
+ * and sets reconfigurationNeeded flag unless configStable is declared.
  */
 export async function updateAssetFull(
   lockfileKey: string,
@@ -94,7 +100,17 @@ export async function updateAssetFull(
     throw new Error(`Asset "${lockfileKey}" is not installed`);
   }
 
-  return installAssetFull(
+  // For folder-based assets, fetch manifest to check configStable (task 7.1)
+  let newManifest: AssetManifest | undefined;
+  if (registryAsset.folder) {
+    try {
+      newManifest = await fetchManifest(installed.registryUrl, registryAsset.folder, githubToken);
+    } catch {
+      // If manifest fetch fails, proceed without it
+    }
+  }
+
+  const result = await installAssetFull(
     registryAsset,
     installed.targets,
     installed.scope as 'project' | 'global',
@@ -103,7 +119,20 @@ export async function updateAssetFull(
     lockfile,
     registryName,
     githubToken,
+    undefined,
+    { skipConfiguredFiles: !!newManifest },
   );
+
+  // Set reconfigurationNeeded flag for folder-based assets with userConfig (task 7.3)
+  if (newManifest?.userConfig && Object.keys(newManifest.userConfig).length > 0) {
+    if (!newManifest.configStable) {
+      result.lockfileEntry.reconfigurationNeeded = true;
+      lockfile.installed[lockfileKey] = result.lockfileEntry;
+      writeLockfile(projectRoot, lockfile);
+    }
+  }
+
+  return result;
 }
 
 /**
@@ -136,15 +165,35 @@ export async function updateAllFull(
 
 /**
  * Remove an installed asset: delete files via adapters, update lockfile.
+ * Returns a script notice if the asset has a postUninstall script.
  */
 export async function removeAssetFull(
   lockfileKey: string,
   projectRoot: string,
   lockfile: Lockfile,
-): Promise<void> {
+): Promise<{ scriptNotice?: string }> {
   const installed = lockfile.installed[lockfileKey];
   if (!installed) {
     throw new Error(`Asset "${lockfileKey}" is not installed`);
+  }
+
+  // Read manifest.json from installed folder before deletion to check for postUninstall (task 6.4)
+  let scriptNotice: string | undefined;
+  if (installed.hasManifest && installed.files.length > 0) {
+    const firstFile = installed.files[0];
+    const assetDir = path.dirname(path.join(projectRoot, firstFile));
+    const manifestPath = path.join(assetDir, 'manifest.json');
+    try {
+      if (fs.existsSync(manifestPath)) {
+        const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8')) as AssetManifest;
+        if (manifest.scripts?.postUninstall) {
+          const scriptPath = path.join(assetDir, manifest.scripts.postUninstall);
+          scriptNotice = buildScriptNotice(scriptPath, 'uninstall');
+        }
+      }
+    } catch {
+      // Ignore manifest read errors during removal
+    }
   }
 
   // Call removeAsset on each target adapter
@@ -158,6 +207,8 @@ export async function removeAssetFull(
   // Remove from lockfile
   delete lockfile.installed[lockfileKey];
   writeLockfile(projectRoot, lockfile);
+
+  return { scriptNotice };
 }
 
 // --- TUI-compatible wrappers ---
@@ -231,11 +282,12 @@ export async function removeAsset(
   const assetName = parts.slice(2).join(':') || lockfileKey;
 
   try {
-    await removeAssetFull(lockfileKey, projectRoot, lockfile);
+    const { scriptNotice } = await removeAssetFull(lockfileKey, projectRoot, lockfile);
     return {
       asset: assetName,
       filesRemoved: files,
       success: true,
+      scriptNotice,
     };
   } catch {
     return {

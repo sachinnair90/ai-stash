@@ -17,6 +17,7 @@ export function RemoveView({ assetName, lockfile, projectRoot, onDone, onCancel 
   const [removing, setRemoving] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [scriptNotice, setScriptNotice] = useState<string | null>(null);
 
   const handleRemove = useCallback(async () => {
     setRemoving(true);
@@ -24,6 +25,9 @@ export function RemoveView({ assetName, lockfile, projectRoot, onDone, onCancel 
     setRemoving(false);
     if (result.success) {
       setDone(true);
+      if (result.scriptNotice) {
+        setScriptNotice(result.scriptNotice);
+      }
     } else {
       setError(`Failed to remove "${assetName}". Check that the files are writable.`);
     }
@@ -72,8 +76,13 @@ export function RemoveView({ assetName, lockfile, projectRoot, onDone, onCancel 
 
   if (done) {
     return (
-      <Box padding={1}>
+      <Box padding={1} flexDirection="column">
         <Text color="green">Removed {assetName}. Press any key to continue.</Text>
+        {scriptNotice && (
+          <Box marginTop={1}>
+            <Text color="yellow">{scriptNotice}</Text>
+          </Box>
+        )}
       </Box>
     );
   }

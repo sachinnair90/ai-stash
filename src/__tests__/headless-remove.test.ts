@@ -50,7 +50,7 @@ beforeEach(() => {
   vi.spyOn(process, 'exit').mockImplementation((_code?: number | string | null | undefined): never => {
     throw new Error(`process.exit(${_code})`);
   });
-  mockRemoveAssetFull.mockResolvedValue(undefined);
+  mockRemoveAssetFull.mockResolvedValue({});
 });
 
 afterEach(() => {

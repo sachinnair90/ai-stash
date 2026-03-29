@@ -1,12 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { RegistryAsset } from '../registry/types.js';
+import type { RegistryAsset, AssetManifest } from '../registry/types.js';
 import { getUnsyncedAssets } from '../lockfile/index.js';
 import type { Lockfile, InstalledAsset, RegistryConfig } from '../lockfile/types.js';
 import type { AssetType } from '../adapters/types.js';
 import { getAdapter } from '../adapters/index.js';
-import { fetchAssetFile } from '../registry/fetcher.js';
+import { fetchAssetFile, fetchManifest } from '../registry/fetcher.js';
 import { writeLockfile } from '../lockfile/writer.js';
+import { collectUserConfig, substituteUserConfig } from './user-config.js';
 import type {
   ConflictResolution,
   FileConflict,
@@ -34,6 +35,7 @@ export interface InstallFileResult {
   files: InstallFileStatus[];
   success: boolean;
   suffixApplied?: { originalName: string; suffixedName: string; conflictingRegistry: string };
+  scriptNotice?: string;
 }
 
 /**
@@ -96,10 +98,28 @@ export async function planInstall(
   registryBaseUrl: string,
   githubToken?: string,
 ): Promise<InstallPlan> {
+  // For folder-based assets, fetch manifest first
+  let manifest: AssetManifest | undefined;
+  let filesToFetch: string[];
+
+  if (asset.folder) {
+    manifest = await fetchManifest(registryBaseUrl, asset.folder, githubToken);
+    filesToFetch = manifest.files;
+  } else {
+    filesToFetch = asset.files;
+  }
+
   // Fetch all asset files from registry
   const rawFiles: Record<string, string> = {};
-  for (const filePath of asset.files) {
+  for (const filePath of filesToFetch) {
     rawFiles[filePath] = await fetchAssetFile(registryBaseUrl, filePath, githubToken);
+  }
+
+  // Collect userConfig if manifest declares it (task 5.1)
+  let nonSensitiveValues: Record<string, string> = {};
+  if (manifest?.userConfig && Object.keys(manifest.userConfig).length > 0) {
+    const collected = await collectUserConfig(asset.name, manifest.userConfig);
+    nonSensitiveValues = collected.nonSensitive;
   }
 
   // Transform files through each target adapter
@@ -114,6 +134,13 @@ export async function planInstall(
     const sourceFiles = Object.keys(adapterFiles);
     for (let i = 0; i < installPaths.length && i < sourceFiles.length; i++) {
       transformedFiles[installPaths[i]] = adapterFiles[sourceFiles[i]];
+    }
+  }
+
+  // Apply userConfig substitution after adapter transformation (task 5.2)
+  if (Object.keys(nonSensitiveValues).length > 0) {
+    for (const filePath of Object.keys(transformedFiles)) {
+      transformedFiles[filePath] = substituteUserConfig(transformedFiles[filePath], nonSensitiveValues);
     }
   }
 
@@ -141,6 +168,7 @@ export async function planInstall(
     scope,
     files: transformedFiles,
     conflicts,
+    manifest,
   };
 }
 
@@ -154,12 +182,32 @@ export async function executeInstall(
   lockfile: Lockfile,
   lockfileKey?: string,
   registryUrl?: string,
+  options?: { skipConfiguredFiles?: boolean },
 ): Promise<InstallResult> {
   const installedFiles: string[] = [];
   const skippedFiles: string[] = [];
 
+  // Build set of configuredFiles to handle specially
+  const configuredFilesSet = new Set<string>();
+  if (plan.manifest?.configuredFiles) {
+    for (const cf of plan.manifest.configuredFiles) {
+      configuredFilesSet.add(cf);
+    }
+  }
+  // Auto-include .setup-complete when postInstall is declared
+  if (plan.manifest?.scripts?.postInstall) {
+    configuredFilesSet.add('.setup-complete');
+  }
+
   for (const [absolutePath, content] of Object.entries(plan.files)) {
     const relativePath = path.relative(projectRoot, absolutePath);
+
+    // Skip configuredFiles during update to preserve user config (task 7.2)
+    if (options?.skipConfiguredFiles && configuredFilesSet.has(path.basename(relativePath))) {
+      skippedFiles.push(relativePath);
+      continue;
+    }
+
     const conflict = plan.conflicts.find((c) => c.filePath === relativePath);
     const resolution = conflict ? resolutions[relativePath] : undefined;
 
@@ -195,6 +243,16 @@ export async function executeInstall(
     installedFiles.push(relativePath);
   }
 
+  // Append configuredFiles entries to .gitignore (task 5.3)
+  if (configuredFilesSet.size > 0) {
+    appendToGitignore(projectRoot, configuredFilesSet);
+  }
+
+  // Exclude configuredFiles from lockfile files[] (task 5.4)
+  const lockfileFiles = installedFiles.filter(
+    (f) => !configuredFilesSet.has(path.basename(f)),
+  );
+
   // Update lockfile
   const lockfileEntry: InstalledAsset = {
     type: plan.asset.type,
@@ -202,20 +260,101 @@ export async function executeInstall(
     installedAt: new Date().toISOString(),
     targets: plan.targets,
     scope: plan.scope,
-    files: installedFiles,
+    files: lockfileFiles,
     registryUrl: registryUrl ?? '',
   };
+
+  // Set hasManifest for folder-based assets (task 5.5)
+  if (plan.manifest) {
+    lockfileEntry.hasManifest = true;
+  }
 
   const key = lockfileKey ?? plan.asset.name;
   lockfile.installed[key] = lockfileEntry;
   writeLockfile(projectRoot, lockfile);
+
+  // Build script notice for postInstall (task 6.1-6.2)
+  let scriptNotice: string | undefined;
+  if (plan.manifest?.scripts?.postInstall) {
+    // Determine the installed folder path from the first installed file
+    const firstFile = installedFiles[0];
+    const assetDir = firstFile ? path.dirname(path.join(projectRoot, firstFile)) : projectRoot;
+    const scriptPath = path.join(assetDir, plan.manifest.scripts.postInstall);
+    scriptNotice = buildScriptNotice(scriptPath, 'install');
+  }
 
   return {
     asset: plan.asset,
     installedFiles,
     skippedFiles,
     lockfileEntry,
+    scriptNotice,
   };
+}
+
+/**
+ * Build a formatted notice string for a lifecycle script.
+ */
+export function buildScriptNotice(scriptPath: string, verb: 'install' | 'uninstall'): string {
+  const action = verb === 'install' ? 'post-install setup' : 'post-uninstall cleanup';
+  return [
+    `\n⚠️  This asset has a ${action} script.`,
+    `   Run it manually:`,
+    `   node ${scriptPath}`,
+    '',
+  ].join('\n');
+}
+
+/**
+ * Check whether a folder-based asset's setup script has been run.
+ * Returns true if the asset has hasManifest and the installed folder lacks .setup-complete.
+ */
+export function checkSetupPending(
+  projectRoot: string,
+  lockfileKey: string,
+  installedAsset: InstalledAsset,
+): boolean {
+  if (!installedAsset.hasManifest) return false;
+  if (installedAsset.files.length === 0) return false;
+
+  const firstFile = installedAsset.files[0];
+  const assetDir = path.dirname(path.join(projectRoot, firstFile));
+  const manifestPath = path.join(assetDir, 'manifest.json');
+
+  try {
+    if (!fs.existsSync(manifestPath)) return false;
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8')) as AssetManifest;
+    if (!manifest.scripts?.postInstall) return false;
+    return !fs.existsSync(path.join(assetDir, '.setup-complete'));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Append paths to .gitignore, avoiding duplicates.
+ */
+function appendToGitignore(projectRoot: string, paths: Set<string>): void {
+  const gitignorePath = path.join(projectRoot, '.gitignore');
+  let existing = '';
+  if (fs.existsSync(gitignorePath)) {
+    existing = fs.readFileSync(gitignorePath, 'utf-8');
+  }
+  const existingLines = new Set(existing.split('\n').map((l) => l.trim()));
+  const toAdd: string[] = [];
+  for (const p of paths) {
+    if (!existingLines.has(p)) {
+      toAdd.push(p);
+    }
+  }
+  if (toAdd.length > 0) {
+    const suffix = existing.endsWith('\n') || existing === '' ? '' : '\n';
+    fs.writeFileSync(
+      gitignorePath,
+      existing + suffix + toAdd.join('\n') + '\n',
+      'utf-8',
+    );
+  }
 }
 
 /**
@@ -233,6 +372,7 @@ export async function installAssetFull(
   registryName: string,
   githubToken?: string,
   onProgress?: (conflicts: FileConflict[]) => Promise<Record<string, ConflictResolution>>,
+  options?: { skipConfiguredFiles?: boolean },
 ): Promise<InstallResult> {
   const { resolvedAsset, lockfileKey } = resolveForInstall(
     asset,
@@ -272,7 +412,16 @@ export async function installAssetFull(
     }
   }
 
-  return executeInstall(plan, resolutions, projectRoot, lockfile, lockfileKey, registryUrl);
+  const result = await executeInstall(plan, resolutions, projectRoot, lockfile, lockfileKey, registryUrl, options);
+
+  // Clear reconfigurationNeeded when user re-installs an asset (task 7.4)
+  if (result.lockfileEntry.reconfigurationNeeded) {
+    delete result.lockfileEntry.reconfigurationNeeded;
+    lockfile.installed[lockfileKey] = result.lockfileEntry;
+    writeLockfile(projectRoot, lockfile);
+  }
+
+  return result;
 }
 
 /**
@@ -385,6 +534,7 @@ export async function installAsset(
       suffixApplied: suffixApplied
         ? { originalName: asset.name, suffixedName: resolvedAsset.name, conflictingRegistry: conflictingRegistry! }
         : undefined,
+      scriptNotice: result.scriptNotice,
     };
   } catch {
     return {

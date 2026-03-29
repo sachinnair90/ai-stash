@@ -289,6 +289,7 @@ export function App() {
         <Header viewName="Installed" staleWarnings={[]} />
         <InstalledView
           lockfile={lockfile}
+          projectRoot={projectRoot}
           onRemove={(key) => setRemoveTarget(key)}
         />
         <Footer />

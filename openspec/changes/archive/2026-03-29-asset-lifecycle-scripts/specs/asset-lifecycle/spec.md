@@ -1,13 +1,4 @@
-### Requirement: Check for updates
-The system SHALL compare installed asset versions (from lockfile) against the registry and identify assets with newer versions available.
-
-#### Scenario: Updates available
-- **WHEN** the user opens the TUI and installed assets have newer registry versions
-- **THEN** the system indicates which assets have updates available with old and new version numbers
-
-#### Scenario: All up to date
-- **WHEN** all installed assets match their registry versions
-- **THEN** the system indicates that everything is up to date
+## MODIFIED Requirements
 
 ### Requirement: Update individual asset
 The system SHALL allow the user to update a single installed asset to the latest registry version. For folder-based assets, the update SHALL re-fetch `manifest.json`, detect any newly declared userConfig keys not yet collected, prompt for them, and preserve existing configuredFiles (not overwrite them).
@@ -57,10 +48,3 @@ The system SHALL provide a bulk update option to update all assets with availabl
 #### Scenario: Bulk update
 - **WHEN** the user triggers "update all"
 - **THEN** the system updates each outdated asset sequentially, showing progress for each, collecting any newly required userConfig inline, and preserving configuredFiles for each
-
-### Requirement: List installed assets
-The system SHALL display all currently installed assets with their version, scope, and target tools.
-
-#### Scenario: Show installed
-- **WHEN** the user views the installed assets list
-- **THEN** the system reads the lockfile and displays each asset's name, type, version, scope, and targets

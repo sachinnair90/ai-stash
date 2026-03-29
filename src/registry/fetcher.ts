@@ -1,4 +1,4 @@
-import type { RegistryIndex, NestedRegistryIndex, RegistryAsset } from './types.js';
+import type { RegistryIndex, NestedRegistryIndex, RegistryAsset, AssetManifest } from './types.js';
 
 const BUCKET_TO_TYPE: Record<string, string> = {
   skills: 'skill',
@@ -53,4 +53,21 @@ export async function fetchAssetFile(baseUrl: string, filePath: string, token?: 
   }
 
   return response.text();
+}
+
+export async function fetchManifest(baseUrl: string, folder: string, githubToken?: string): Promise<AssetManifest> {
+  const manifestPath = `${folder}/manifest.json`;
+  const url = new URL(manifestPath, baseUrl).href;
+  const response = await fetch(url, { headers: authHeaders(githubToken) });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch manifest for folder "${folder}": ${response.status} ${response.statusText}`);
+  }
+
+  const data = await response.json() as AssetManifest;
+
+  if (!Array.isArray(data.files)) {
+    throw new Error(`Invalid manifest for folder "${folder}": missing or invalid "files" array`);
+  }
+
+  return data;
 }

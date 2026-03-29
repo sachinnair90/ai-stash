@@ -8,8 +8,28 @@ export interface RegistryAsset {
   /** Registry-root-relative paths, e.g. "skills/foo/main.md" */
   files: string[];
   manifestUrl: string;
+  /** Single file path for simple assets (skill, agent, instruction, command) */
+  file?: string;
+  /** Folder path for complex assets (hook, mcp-server, plugin) — engine fetches manifest.json from here */
+  folder?: string;
   /** Name of the source registry (populated after multi-registry merge) */
   registryName: string;
+}
+
+export interface UserConfigEntry {
+  description: string;
+  sensitive: boolean;
+}
+
+export interface AssetManifest {
+  files: string[];
+  userConfig?: Record<string, UserConfigEntry>;
+  scripts?: {
+    postInstall?: string;
+    postUninstall?: string;
+  };
+  configuredFiles?: string[];
+  configStable?: boolean;
 }
 
 /** Normalised flat form used internally throughout the engine and UI */

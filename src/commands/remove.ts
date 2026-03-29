@@ -38,7 +38,10 @@ export async function handleRemoveCommand(args: string[]): Promise<void> {
   }
 
   for (const key of matchingKeys) {
-    await removeAssetFull(key, root, lockfile);
+    const { scriptNotice } = await removeAssetFull(key, root, lockfile);
+    if (scriptNotice) {
+      process.stderr.write(scriptNotice);
+    }
   }
 
   console.log(`Removed ${type} '${name}'`);

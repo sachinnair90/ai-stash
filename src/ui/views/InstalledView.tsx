@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 import type { Lockfile } from '../../lockfile/types.js';
+import { checkSetupPending } from '../../engine/install.js';
 
 interface InstalledViewProps {
   lockfile: Lockfile | null;
+  projectRoot: string;
   onRemove: (lockfileKey: string) => void;
 }
 
@@ -24,7 +26,7 @@ function registryNameFrom(lockfileKey: string): string {
   return lockfileKey.split(':')[0] ?? lockfileKey;
 }
 
-export function InstalledView({ lockfile, onRemove }: InstalledViewProps) {
+export function InstalledView({ lockfile, projectRoot, onRemove }: InstalledViewProps) {
   const entries = lockfile ? Object.entries(lockfile.installed) : [];
   const [selectedIndex, setSelectedIndex] = useState(0);
 
@@ -57,6 +59,8 @@ export function InstalledView({ lockfile, onRemove }: InstalledViewProps) {
           const orphaned = lockfile ? isOrphaned(lockfileKey, lockfile) : false;
           const regName = registryNameFrom(lockfileKey);
           const name = displayName(lockfileKey);
+          const setupPending = lockfile ? checkSetupPending(projectRoot, lockfileKey, asset) : false;
+          const needsReconfig = asset.reconfigurationNeeded ?? false;
           return (
             <Box key={lockfileKey}>
               <Text inverse={index === selectedIndex}>
@@ -66,6 +70,8 @@ export function InstalledView({ lockfile, onRemove }: InstalledViewProps) {
                 <Text color="cyan">{asset.scope} </Text>
                 <Text dimColor>{asset.targets.join(', ')}</Text>
                 {orphaned && <Text color="yellow"> — registry '{regName}' not configured</Text>}
+                {setupPending && <Text color="magenta"> [setup pending]</Text>}
+                {needsReconfig && <Text color="yellow"> [reconfiguration needed]</Text>}
               </Text>
             </Box>
           );

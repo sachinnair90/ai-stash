@@ -66,4 +66,7 @@ export async function handleAddCommand(args: string[]): Promise<void> {
   );
 
   console.log(`Installed ${type} '${result.asset.name}' (v${result.asset.version}) [${scope}]`);
+  if (result.scriptNotice) {
+    process.stderr.write(result.scriptNotice);
+  }
 }

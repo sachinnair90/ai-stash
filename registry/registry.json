@@ -124,11 +124,7 @@
       "description": "Runs TypeScript type-checking asynchronously after every Edit or Write on a .ts/.tsx file. Surfaces type errors in the Claude Code output without blocking the main process.",
       "tags": ["typescript", "quality", "automation", "hooks"],
       "targets": ["claude-code"],
-      "files": [
-        "hooks/post-edit-typecheck/hook-config.json",
-        "hooks/post-edit-typecheck/run.sh"
-      ],
-      "manifestUrl": "hooks/post-edit-typecheck/hook-config.json"
+      "folder": "hooks/post-edit-typecheck"
     }
   ],
   "mcpServers": [
@@ -138,10 +134,7 @@
       "description": "GitHub MCP server. Gives your AI assistant direct access to GitHub APIs — read issues, PRs, files, commits, and repo metadata without leaving the IDE.",
       "tags": ["github", "issues", "pull-requests", "git", "mcp"],
       "targets": ["claude-code", "copilot"],
-      "files": [
-        "mcp-servers/github/mcp.json"
-      ],
-      "manifestUrl": "mcp-servers/github/mcp.json"
+      "folder": "mcp-servers/github"
     }
   ],
   "plugins": [
@@ -151,14 +144,7 @@
       "description": "End-to-end development workflow plugin. Bundles a planning agent (opus), conventional commit skill, and pre-push safety hook into one installable Claude Code plugin.",
       "tags": ["workflow", "planning", "git", "commits", "hooks", "productivity"],
       "targets": ["claude-code", "copilot"],
-      "files": [
-        "plugins/dev-workflow/.claude-plugin/plugin.json",
-        "plugins/dev-workflow/agents/planner.md",
-        "plugins/dev-workflow/skills/commit/SKILL.md",
-        "plugins/dev-workflow/hooks/hooks.json",
-        "plugins/dev-workflow/hooks/pre-push-reminder.sh"
-      ],
-      "manifestUrl": "plugins/dev-workflow/.claude-plugin/plugin.json"
+      "folder": "plugins/dev-workflow"
     }
   ]
 }

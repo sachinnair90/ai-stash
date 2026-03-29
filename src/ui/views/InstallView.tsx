@@ -34,6 +34,7 @@ export function InstallView({ assets, onDone, onCancel, registryBaseUrl, registr
   const [installing, setInstalling] = useState(false);
   const [conflictFile, setConflictFile] = useState<string | null>(null);
   const [suffixNotices, setSuffixNotices] = useState<SuffixNotice[]>([]);
+  const [scriptNotices, setScriptNotices] = useState<string[]>([]);
 
   const runInstall = useCallback(async () => {
     setStep('progress');
@@ -73,6 +74,10 @@ export function InstallView({ assets, onDone, onCancel, registryBaseUrl, registr
 
       if (result.suffixApplied) {
         setSuffixNotices((prev) => [...prev, result.suffixApplied!]);
+      }
+
+      if (result.scriptNotice) {
+        setScriptNotices((prev) => [...prev, result.scriptNotice!]);
       }
 
       setResults((prev) => {
@@ -224,6 +229,13 @@ export function InstallView({ assets, onDone, onCancel, registryBaseUrl, registr
                 <Text dimColor>  "{n.originalName}" from "{registryName}" installed as "{n.suffixedName}"</Text>
                 <Text dimColor>  Reason: "{n.originalName}" already installed from registry "{n.conflictingRegistry}"</Text>
               </Box>
+            ))}
+          </Box>
+        )}
+        {step === 'done' && scriptNotices.length > 0 && (
+          <Box marginTop={1} flexDirection="column">
+            {scriptNotices.map((notice, i) => (
+              <Text key={i} color="yellow">{notice}</Text>
             ))}
           </Box>
         )}

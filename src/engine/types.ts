@@ -1,4 +1,4 @@
-import type { RegistryAsset } from '../registry/types.js';
+import type { RegistryAsset, AssetManifest } from '../registry/types.js';
 import type { InstalledAsset } from '../lockfile/types.js';
 
 export type ConflictResolution = 'merge' | 'overwrite' | 'skip';
@@ -16,6 +16,7 @@ export interface InstallPlan {
   scope: 'project' | 'global';
   files: Record<string, string>;
   conflicts: FileConflict[];
+  manifest?: AssetManifest;
 }
 
 export interface InstallResult {
@@ -23,4 +24,5 @@ export interface InstallResult {
   installedFiles: string[];
   skippedFiles: string[];
   lockfileEntry: InstalledAsset;
+  scriptNotice?: string;
 }

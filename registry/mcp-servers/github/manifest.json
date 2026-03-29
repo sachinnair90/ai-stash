@@ -1,0 +1,6 @@
+{
+  "files": [
+    "mcp.json"
+  ],
+  "notes": "No userConfig declared — GitHub authentication is handled externally by the GitHub CLI / Claude Code auth, not by ai-stash."
+}

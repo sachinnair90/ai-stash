@@ -11,6 +11,8 @@ export interface InstalledAsset {
   scope: string;
   files: string[];
   registryUrl: string;
+  hasManifest?: boolean;
+  reconfigurationNeeded?: boolean;
 }
 
 export interface Lockfile {

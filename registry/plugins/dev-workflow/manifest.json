@@ -1,0 +1,9 @@
+{
+  "files": [
+    ".claude-plugin/plugin.json",
+    "agents/planner.md",
+    "skills/commit/SKILL.md",
+    "hooks/hooks.json",
+    "hooks/pre-push-reminder.sh"
+  ]
+}
