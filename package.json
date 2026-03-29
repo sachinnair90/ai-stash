@@ -1,5 +1,5 @@
 {
-  "name": "ai-stash",
+  "name": "@sachinnair90/ai-stash",
   "version": "0.1.0",
   "type": "module",
   "description": "CLI tool for managing AI assistant assets",
@@ -10,6 +10,9 @@
     "node": ">=18"
   },
   "files": ["dist/", "bundled/", "scripts/postinstall.js", "README.md"],
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
   "exports": { ".": "./dist/cli.js" },
   "scripts": {
     "prepare": "npm run build",

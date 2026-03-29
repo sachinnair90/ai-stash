@@ -1,11 +1,16 @@
+> **⚠️ Preview:** This tool is under active development. Breaking changes may occur until a stable release (`v1.0.0`) is tagged.
+
 # ai-stash
+
+[![Release](https://github.com/sachinnair90/ai-stash/actions/workflows/release.yml/badge.svg)](https://github.com/sachinnair90/ai-stash/actions/workflows/release.yml)
+[![GitHub release](https://img.shields.io/github/v/release/sachinnair90/ai-stash)](https://github.com/sachinnair90/ai-stash/releases/latest)
 
 Bootstrap your coding assistant setup with reusable skills, agents, and instructions via an interactive TUI.
 
-`ai-stash` is a zero-setup CLI tool for browsing, installing, updating, and removing AI assistant assets — skills, agents, instructions, hooks, and prompts — for both **Claude Code** and **GitHub Copilot**.
+`ai-stash` is a zero-setup CLI tool for browsing, installing, updating, and removing AI assistant assets — skills, agents, instructions, hooks, commands, plugins, and MCP servers — for both **Claude Code** and **GitHub Copilot**.
 
 ```
-npx ai-stash
+npx @sachinnair90/ai-stash
 ```
 
 ---
@@ -20,28 +25,36 @@ npx ai-stash
 
 ## Installation
 
-### Zero-install (recommended)
+### GitHub Packages (recommended)
 
-No installation required. Run directly with npx:
+1. Add the scoped registry to your `.npmrc` (project or global):
 
-```bash
-npx ai-stash
+```
+@sachinnair90:registry=https://npm.pkg.github.com
 ```
 
-On first run, npx downloads the package and launches the TUI. Subsequent runs use the npm cache.
-
-### Global install
+2. Install globally:
 
 ```bash
-npm install -g ai-stash
+npm install -g @sachinnair90/ai-stash
 ai-stash
 ```
 
-### From GitHub (latest unreleased)
+Or run without installing:
 
 ```bash
-npx github:ai-stash/ai-stash
+npx @sachinnair90/ai-stash
 ```
+
+### Global install (zero-config)
+
+No `.npmrc` setup needed — run directly from GitHub:
+
+```bash
+npx github:sachinnair90/ai-stash
+```
+
+On first run, npx fetches the package from GitHub and launches the TUI. Subsequent runs use the npm cache.
 
 ---
 
@@ -119,8 +132,71 @@ Press `l` to open the Installed view — lists every asset tracked in `ai-stash.
 | **skill** | Reusable slash commands | `.claude/skills/{name}/` | `.github/skills/{name}/` |
 | **agent** | Sub-agent definitions | `.claude/agents/{name}.md` | `.github/agents/{name}.agent.md` |
 | **instruction** | Persistent context added to CLAUDE.md / AGENTS.md | `CLAUDE.md` | `AGENTS.md` |
-| **hook** | Event-triggered shell scripts | `.claude/settings.json` + scripts | `.github/hooks/hooks.json` + scripts |
-| **prompt** | Slash-command prompt templates | `.claude/skills/{name}/SKILL.md` | `.github/prompts/{name}.prompt.md` |
+| **hook** | Event-triggered shell scripts | `.claude/settings.json` + `.claude/hooks/{name}/` | `.github/hooks/hooks.json` |
+| **command** | Slash-command prompt templates | `.claude/skills/{name}/SKILL.md` | `.github/prompts/{name}.prompt.md` |
+| **plugin** | Plugin files | `.claude/plugins/{name}/` | `.github/plugins/{name}/` |
+| **mcp-server** | MCP server configuration | `.mcp.json` (project) / `~/.claude/mcp.json` (global) | `.vscode/mcp.json` |
+
+---
+
+## Headless CLI commands
+
+All actions available in the TUI are also available as non-interactive CLI commands, useful for scripting and CI.
+
+### `ai-stash add <type> <name>`
+
+Install an asset directly without the TUI.
+
+```bash
+ai-stash add skill code-review
+ai-stash add skill code-review --registry my-registry
+ai-stash add skill code-review --accept-script-risks
+```
+
+### `ai-stash remove <type> <name>`
+
+Remove an installed asset.
+
+```bash
+ai-stash remove skill code-review
+ai-stash remove skill code-review --force  # skip confirmation for assets with scripts
+```
+
+### `ai-stash update <type> <name>` / `--all`
+
+Update one or all installed assets.
+
+```bash
+ai-stash update skill code-review
+ai-stash update --all
+ai-stash update --all --accept-script-risks
+```
+
+### `ai-stash list`
+
+List all installed assets from the lockfile.
+
+```bash
+ai-stash list
+```
+
+### `ai-stash sync`
+
+Sync missing assets from the lockfile to disk (same as pressing `s` in the TUI).
+
+```bash
+ai-stash sync
+```
+
+### `ai-stash registry`
+
+Manage configured registries.
+
+```bash
+ai-stash registry list
+ai-stash registry add https://raw.githubusercontent.com/my-org/my-registry/main/registry.json --name my-registry
+ai-stash registry remove my-registry
+```
 
 ---
 
@@ -233,10 +309,11 @@ Run the full test suite with Vitest:
 pnpm run test
 ```
 
-Seven test suites cover the core layers:
+Thirteen test suites cover the core layers:
 
 | File | What it tests |
 |------|---------------|
+| `asset-lifecycle.test.ts` | Manifest fetching, credential storage, user-config collection, and install/update/remove engine lifecycle |
 | `claude-code-adapter.test.ts` | File path mapping and content transforms for the Claude Code adapter |
 | `copilot-adapter.test.ts` | File path mapping and content transforms for the Copilot adapter |
 | `install-engine.test.ts` | `planInstall`, `dryRunInstall`, and `executeInstall` — conflict detection and file writing |
@@ -244,6 +321,11 @@ Seven test suites cover the core layers:
 | `registry-client.test.ts` | Registry fetch, disk caching, TTL, and offline fallback |
 | `lockfile.test.ts` | Lockfile read, write, and schema validation |
 | `integration.test.ts` | Full install → update → remove lifecycle against a temp directory |
+| `headless-add.test.ts` | `handleAddCommand` — headless `add` CLI command |
+| `headless-remove.test.ts` | `handleRemoveCommand` — headless `remove` CLI command |
+| `headless-update.test.ts` | `handleUpdateCommand` — headless `update` CLI command (single and `--all`) |
+| `headless-list.test.ts` | `handleListCommand` — headless `list` CLI command |
+| `headless-sync.test.ts` | `handleSyncCommand` — headless `sync` CLI command |
 
 Run a single file:
 
@@ -276,7 +358,7 @@ This requires a registry server to be running locally (the app's configured regi
 
 ### Setting up (one person)
 
-1. Run `npx ai-stash` in your project root and install the assets your team needs
+1. Run `npx @sachinnair90/ai-stash` in your project root and install the assets your team needs
 2. Commit the generated lockfile:
 
 ```bash
@@ -288,7 +370,7 @@ git commit -m "chore: add ai-stash asset lockfile"
 
 When a teammate clones the repository the lockfile is already present but the asset files are not yet installed locally. One command syncs everything:
 
-1. Run `npx ai-stash` from the project root
+1. Run `npx @sachinnair90/ai-stash` from the project root
 2. The footer shows **`s sync (N)`** in yellow — the number of assets missing locally
 3. Press `s` to open the **Sync** view, which lists every uninstalled asset with its recorded version, scope, and targets
 4. Press `y` to confirm — all missing assets are installed automatically using the exact scope and targets from the lockfile
