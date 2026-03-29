@@ -1,6 +1,7 @@
 {
   "name": "@sachinnair90/ai-stash",
   "version": "0.1.0",
+  "packageManager": "pnpm@10.33.0",
   "type": "module",
   "description": "CLI tool for managing AI assistant assets",
   "bin": {
