@@ -1,0 +1,17 @@
+{
+  "files": [
+    ".squad/agents/speccer/charter.md",
+    ".squad/agents/speccer/history.md",
+    ".squad/skills/openspec/SKILL.md",
+    ".squad/skills/openspec-scribe/SKILL.md",
+    "patches/ceremonies-patch.md",
+    "patches/routing-patch.md",
+    "scripts/setup.js",
+    "scripts/cleanup.js"
+  ],
+  "scripts": {
+    "postInstall": "scripts/setup.js",
+    "postUninstall": "scripts/cleanup.js"
+  },
+  "scriptRisks": "SCRIPT_RISKS.md"
+}
