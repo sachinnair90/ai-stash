@@ -35,6 +35,7 @@ const sampleSkill: RegistryAsset = {
   targets: ['claude-code'],
   files: ['assets/git-commit/SKILL.md'],
   manifestUrl: 'assets/git-commit/SKILL.md',
+  registryName: 'test',
 };
 
 const sampleAgent: RegistryAsset = {
@@ -46,6 +47,7 @@ const sampleAgent: RegistryAsset = {
   targets: ['claude-code'],
   files: ['assets/debug-agent/AGENT.md'],
   manifestUrl: 'assets/debug-agent/AGENT.md',
+  registryName: 'test',
 };
 
 let tmpDir: string;
@@ -76,6 +78,7 @@ describe('installAsset (TUI wrapper) — basic install flow', () => {
         targets: ['claude-code'],
         projectRoot: tmpDir,
         registryBaseUrl: 'https://example.com/registry.json',
+        registryName: 'test',
       },
     );
 
@@ -96,9 +99,10 @@ describe('installAsset (TUI wrapper) — basic install flow', () => {
     // Lockfile must record the installed file path (not an empty array)
     const lockfileRaw = fs.readFileSync(path.join(tmpDir, 'ai-stash.lock.json'), 'utf-8');
     const lockfile = JSON.parse(lockfileRaw);
-    expect(lockfile.installed['git-commit']).toBeDefined();
-    expect(lockfile.installed['git-commit'].files).toHaveLength(1);
-    expect(lockfile.installed['git-commit'].files[0]).toBe('.claude/skills/git-commit/SKILL.md');
+    // Key format is registry:type:name
+    expect(lockfile.installed['test:skill:git-commit']).toBeDefined();
+    expect(lockfile.installed['test:skill:git-commit'].files).toHaveLength(1);
+    expect(lockfile.installed['test:skill:git-commit'].files[0]).toBe('.claude/skills/git-commit/SKILL.md');
   });
 
   it('installs a skill to global scope under ~/.claude/skills/', async () => {
@@ -109,6 +113,7 @@ describe('installAsset (TUI wrapper) — basic install flow', () => {
         targets: ['claude-code'],
         projectRoot: tmpDir,
         registryBaseUrl: 'https://example.com/registry.json',
+        registryName: 'test',
       },
     );
 
@@ -129,6 +134,7 @@ describe('installAsset (TUI wrapper) — basic install flow', () => {
         targets: ['claude-code'],
         projectRoot: tmpDir,
         registryBaseUrl: 'https://example.com/registry.json',
+        registryName: 'test',
       },
     );
 
@@ -140,8 +146,8 @@ describe('installAsset (TUI wrapper) — basic install flow', () => {
 
     const lockfileRaw = fs.readFileSync(path.join(tmpDir, 'ai-stash.lock.json'), 'utf-8');
     const lockfile = JSON.parse(lockfileRaw);
-    expect(lockfile.installed['debug-agent'].files).toHaveLength(1);
-    expect(lockfile.installed['debug-agent'].files[0]).toBe('.claude/agents/debug-agent.md');
+    expect(lockfile.installed['test:agent:debug-agent'].files).toHaveLength(1);
+    expect(lockfile.installed['test:agent:debug-agent'].files[0]).toBe('.claude/agents/debug-agent.md');
   });
 
   it('installs to both claude-code and copilot targets', async () => {
@@ -152,6 +158,7 @@ describe('installAsset (TUI wrapper) — basic install flow', () => {
         targets: ['claude-code', 'copilot'],
         projectRoot: tmpDir,
         registryBaseUrl: 'https://example.com/registry.json',
+        registryName: 'test',
       },
     );
 
@@ -180,6 +187,7 @@ describe('installAsset (TUI wrapper) — basic install flow', () => {
         targets: ['claude-code'],
         projectRoot: tmpDir,
         registryBaseUrl: 'https://example.com/registry.json',
+        registryName: 'test',
       },
     );
 
@@ -196,6 +204,7 @@ describe('installAsset (TUI wrapper) — basic install flow', () => {
       targets: ['claude-code'],
       projectRoot: tmpDir,
       registryBaseUrl: 'https://example.com/registry.json',
+        registryName: 'test',
     };
 
     // First install
@@ -230,6 +239,7 @@ describe('installAsset (TUI wrapper) — basic install flow', () => {
         targets: ['claude-code'],
         projectRoot: tmpDir,
         registryBaseUrl: 'https://example.com/registry.json',
+        registryName: 'test',
       },
       (status) => progressEvents.push({ file: status.file, status: status.status }),
     );

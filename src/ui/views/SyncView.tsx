@@ -9,7 +9,6 @@ import { syncFromLockfile } from '../../engine/install.js';
 interface SyncViewProps {
   lockfile: Lockfile | null;
   assets: RegistryAsset[];
-  registryBaseUrl: string;
   projectRoot: string;
   onDone: () => void;
   githubToken?: string;
@@ -17,15 +16,15 @@ interface SyncViewProps {
 
 type Step = 'confirm' | 'syncing' | 'done';
 
-export function SyncView({ lockfile, assets, registryBaseUrl, projectRoot, onDone, githubToken }: SyncViewProps) {
+export function SyncView({ lockfile, assets, projectRoot, onDone, githubToken }: SyncViewProps) {
   const unsynced = lockfile ? getUnsyncedAssets(lockfile, projectRoot) : [];
 
-  type AssetStatus = 'pending' | 'installing' | 'done' | 'skipped' | 'failed';
+  type AssetStatus = 'pending' | 'installing' | 'done' | 'skipped' | 'failed' | 'orphaned';
   const [step, setStep] = useState<Step>('confirm');
   const [statuses, setStatuses] = useState<Map<string, AssetStatus>>(
     new Map(unsynced.map(({ name }) => [name, 'pending']))
   );
-  const [summary, setSummary] = useState<{ installed: string[]; skipped: string[]; failed: string[] } | null>(null);
+  const [summary, setSummary] = useState<{ installed: string[]; skipped: string[]; failed: string[]; orphaned: string[] } | null>(null);
 
   const runSync = useCallback(async () => {
     if (!lockfile) return;
@@ -35,7 +34,6 @@ export function SyncView({ lockfile, assets, registryBaseUrl, projectRoot, onDon
       lockfile,
       assets,
       projectRoot,
-      registryBaseUrl,
       (name, status) => {
         setStatuses((prev) => new Map(prev).set(name, status));
       },
@@ -44,7 +42,7 @@ export function SyncView({ lockfile, assets, registryBaseUrl, projectRoot, onDon
 
     setSummary(result);
     setStep('done');
-  }, [lockfile, assets, projectRoot, registryBaseUrl, githubToken]);
+  }, [lockfile, assets, projectRoot, githubToken]);
 
   useInput((input, key) => {
     if (step === 'confirm') {
@@ -103,10 +101,12 @@ export function SyncView({ lockfile, assets, registryBaseUrl, projectRoot, onDon
                 {status === 'installing' && <><Spinner type="dots" /><Text> </Text></>}
                 {status === 'done' && <Text color="green">✓ </Text>}
                 {status === 'skipped' && <Text color="yellow">⚠ </Text>}
+                {status === 'orphaned' && <Text color="yellow">⚠ </Text>}
                 {status === 'failed' && <Text color="red">✗ </Text>}
                 {status === 'pending' && <Text dimColor>  </Text>}
                 <Text dimColor={status === 'pending'}>{name}</Text>
                 {status === 'skipped' && <Text dimColor> (not in registry)</Text>}
+                {status === 'orphaned' && <Text dimColor> (registry not configured)</Text>}
                 {status === 'failed' && <Text dimColor> (failed)</Text>}
               </Box>
             );
@@ -120,6 +120,7 @@ export function SyncView({ lockfile, assets, registryBaseUrl, projectRoot, onDon
   const installed = summary?.installed.length ?? 0;
   const skipped = summary?.skipped.length ?? 0;
   const failed = summary?.failed.length ?? 0;
+  const orphaned = summary?.orphaned.length ?? 0;
 
   return (
     <Box flexDirection="column" padding={1}>
@@ -131,9 +132,11 @@ export function SyncView({ lockfile, assets, registryBaseUrl, projectRoot, onDon
             <Box key={name}>
               {status === 'done' && <Text color="green">✓ </Text>}
               {status === 'skipped' && <Text color="yellow">⚠ </Text>}
+              {status === 'orphaned' && <Text color="yellow">⚠ </Text>}
               {status === 'failed' && <Text color="red">✗ </Text>}
               <Text>{name}</Text>
               {status === 'skipped' && <Text dimColor> (not in registry — skipped)</Text>}
+              {status === 'orphaned' && <Text dimColor> (registry not configured — skipped)</Text>}
               {status === 'failed' && <Text dimColor> (install failed)</Text>}
             </Box>
           );
@@ -142,6 +145,7 @@ export function SyncView({ lockfile, assets, registryBaseUrl, projectRoot, onDon
       <Box marginTop={1}>
         <Text color="green">{installed} installed</Text>
         {skipped > 0 && <Text color="yellow">  {skipped} skipped</Text>}
+        {orphaned > 0 && <Text color="yellow">  {orphaned} orphaned</Text>}
         {failed > 0 && <Text color="red">  {failed} failed</Text>}
       </Box>
       <Box marginTop={1}><Text dimColor>Escape to go back</Text></Box>

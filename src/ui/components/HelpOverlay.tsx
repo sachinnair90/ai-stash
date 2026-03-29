@@ -28,6 +28,7 @@ const groups: ShortcutGroup[] = [
       { key: 'i', description: 'Install selected' },
       { key: 'u', description: 'Open updates' },
       { key: 'l', description: 'List installed' },
+      { key: 'R', description: 'Manage registries' },
       { key: 'r', description: 'Remove asset' },
       { key: 'q', description: 'Quit' },
       { key: '?', description: 'Toggle help' },

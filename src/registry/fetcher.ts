@@ -1,4 +1,4 @@
-import type { RegistryIndex, NestedRegistryIndex, RegistryAsset } from './types.js';
+import type { RegistryIndex, NestedRegistryIndex, RegistryAsset, AssetManifest } from './types.js';
 
 const BUCKET_TO_TYPE: Record<string, string> = {
   skills: 'skill',
@@ -33,7 +33,7 @@ export async function fetchRegistry(url: string, token?: string): Promise<Regist
     const items = (data as unknown as Record<string, unknown>)[bucket] as Omit<RegistryAsset, 'type'>[] | undefined;
     if (items) {
       for (const item of items) {
-        assets.push({ ...item, type });
+        assets.push({ ...item, type, registryName: '' });
       }
     }
   }
@@ -53,4 +53,40 @@ export async function fetchAssetFile(baseUrl: string, filePath: string, token?: 
   }
 
   return response.text();
+}
+
+export async function fetchManifest(baseUrl: string, folder: string, githubToken?: string): Promise<AssetManifest> {
+  const manifestPath = `${folder}/manifest.json`;
+  const url = new URL(manifestPath, baseUrl).href;
+  const response = await fetch(url, { headers: authHeaders(githubToken) });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch manifest for folder "${folder}": ${response.status} ${response.statusText}`);
+  }
+
+  const data = await response.json() as AssetManifest;
+
+  if (!Array.isArray(data.files)) {
+    throw new Error(`Invalid manifest for folder "${folder}": missing or invalid "files" array`);
+  }
+
+  return data;
+}
+
+/**
+ * Fetch the SCRIPT_RISKS.md content for an asset manifest.
+ * Returns the file's text on success, or null if the fetch fails (network error or 4xx/5xx).
+ */
+export async function fetchScriptRisks(
+  baseUrl: string,
+  scriptRisksPath: string,
+  token?: string,
+): Promise<string | null> {
+  try {
+    const url = new URL(scriptRisksPath, baseUrl).href;
+    const response = await fetch(url, { headers: authHeaders(token) });
+    if (!response.ok) return null;
+    return response.text();
+  } catch {
+    return null;
+  }
 }

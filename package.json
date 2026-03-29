@@ -1,6 +1,7 @@
 {
-  "name": "ai-stash",
+  "name": "@sachinnair90/ai-stash",
   "version": "0.1.0",
+  "packageManager": "pnpm@10.33.0",
   "type": "module",
   "description": "CLI tool for managing AI assistant assets",
   "bin": {
@@ -10,8 +11,12 @@
     "node": ">=18"
   },
   "files": ["dist/", "bundled/", "scripts/postinstall.js", "README.md"],
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
   "exports": { ".": "./dist/cli.js" },
   "scripts": {
+    "prepare": "npm run build",
     "build": "tsc && node -e \"const fs=require('fs');const c=fs.readFileSync('dist/cli.js','utf8');fs.writeFileSync('dist/cli.js','#!/usr/bin/env node\\n'+c)\" && node -e \"const fs=require('fs');fs.mkdirSync('bundled/skills/add-asset',{recursive:true});fs.copyFileSync('registry/skills/add-asset/SKILL.md','bundled/skills/add-asset/SKILL.md');\"",
     "postinstall": "node ./scripts/postinstall.js",
     "dev": "tsx --env-file=.env src/cli.tsx",
@@ -21,6 +26,7 @@
   },
   "dependencies": {
     "ink": "^5.1.0",
+    "keytar": "^7.9.0",
     "react": "^18.3.1",
     "ink-select-input": "^6.0.0",
     "ink-text-input": "^6.0.0",

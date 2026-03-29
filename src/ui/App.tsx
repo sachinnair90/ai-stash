@@ -11,16 +11,18 @@ import { UpdateView } from './views/UpdateView.js';
 import { InstalledView } from './views/InstalledView.js';
 import { RemoveView } from './views/RemoveView.js';
 import { SyncView } from './views/SyncView.js';
+import { SetupView } from './views/SetupView.js';
+import { RegistriesView } from './views/RegistriesView.js';
 import { useFilter } from './hooks/useFilter.js';
 import type { RegistryAsset } from '../registry/types.js';
-import type { Lockfile } from '../lockfile/types.js';
-import { loadConfig } from '../config/loader.js';
-import { getRegistry } from '../registry/client.js';
-import { readLockfile } from '../lockfile/reader.js';
+import type { Lockfile, RegistryConfig } from '../lockfile/types.js';
+import { getRegistries } from '../registry/client.js';
+import { readLockfile, writeLockfile } from '../lockfile/index.js';
 import { getProjectRoot } from '../config/paths.js';
 import { getUnsyncedAssets } from '../lockfile/index.js';
+import { execFileSync } from 'node:child_process';
 
-export type ViewName = 'browse' | 'install' | 'updates' | 'installed' | 'sync';
+export type ViewName = 'browse' | 'install' | 'updates' | 'installed' | 'sync' | 'registries';
 
 const viewLabels: Record<ViewName, string> = {
   browse: 'Browse',
@@ -28,10 +30,20 @@ const viewLabels: Record<ViewName, string> = {
   updates: 'Updates',
   installed: 'Installed',
   sync: 'Sync',
+  registries: 'Registries',
 };
 
 // header (2) + search (1) + footer (1)
 const CHROME_ROWS = 4;
+
+function resolveGithubToken(): string | undefined {
+  if (process.env['GITHUB_TOKEN']) return process.env['GITHUB_TOKEN'];
+  try {
+    const token = execFileSync('gh', ['auth', 'token'], { encoding: 'utf-8' }).trim();
+    if (token) return token;
+  } catch { /* gh not installed or not authenticated */ }
+  return undefined;
+}
 
 export function App() {
   const { stdout } = useStdout();
@@ -39,13 +51,12 @@ export function App() {
   const { exit } = useApp();
 
   // Data loading
-  const [loadState, setLoadState] = useState<'loading' | 'error' | 'ready'>('loading');
+  const [loadState, setLoadState] = useState<'setup' | 'loading' | 'error' | 'ready'>('loading');
   const [errorMsg, setErrorMsg] = useState('');
   const [assets, setAssets] = useState<RegistryAsset[]>([]);
   const [lockfile, setLockfile] = useState<Lockfile | null>(null);
-  const [registryBaseUrl, setRegistryBaseUrl] = useState('');
-  const [githubToken, setGithubToken] = useState<string | undefined>(undefined);
-  const [staleWarning, setStaleWarning] = useState<string | null>(null);
+  const [githubToken] = useState<string | undefined>(resolveGithubToken);
+  const [staleWarnings, setStaleWarnings] = useState<string[]>([]);
   const [projectRoot, setProjectRoot] = useState('');
 
   // View routing
@@ -63,30 +74,34 @@ export function App() {
   const [searchActive, setSearchActive] = useState(false);
   const { search, setSearch, typeFilter, targetFilter, filtered } = useFilter(assets);
 
-  useEffect(() => {
-    async function load() {
-      try {
-        const config = loadConfig();
-        setRegistryBaseUrl(config.registry.url);
-        setGithubToken(config.githubToken);
-        const root = getProjectRoot(process.cwd()) ?? process.cwd();
-        setProjectRoot(root);
-        setLockfile(readLockfile(root));
-        const { registry, stale, cacheAge } = await getRegistry(config);
-        setAssets(registry.assets);
-        setUnsyncedCount(getUnsyncedAssets(readLockfile(root), root).length);
-        if (stale) {
-          const mins = Math.round(cacheAge / 60000);
-          setStaleWarning(`Using cached registry (${mins}m old)`);
-        }
-        setLoadState('ready');
-      } catch (e) {
-        setErrorMsg(e instanceof Error ? e.message : String(e));
-        setLoadState('error');
+  const loadRegistry = useCallback(async (initialLockfile?: Lockfile) => {
+    try {
+      const root = getProjectRoot(process.cwd()) ?? process.cwd();
+      setProjectRoot(root);
+      const lf = initialLockfile ?? readLockfile(root);
+
+      if (!lf || lf.registries.length === 0) {
+        setLoadState('setup');
+        return;
       }
+
+      setLockfile(lf);
+      setUnsyncedCount(getUnsyncedAssets(lf, root).length);
+
+      const token = githubToken;
+      const { assets: registryAssets, warnings } = await getRegistries(lf.registries, token);
+      setAssets(registryAssets);
+      setStaleWarnings(warnings.map((w) => w.message));
+      setLoadState('ready');
+    } catch (e) {
+      setErrorMsg(e instanceof Error ? e.message : String(e));
+      setLoadState('error');
     }
-    void load();
-  }, []);
+  }, [githubToken]);
+
+  useEffect(() => {
+    void loadRegistry();
+  }, [loadRegistry]);
 
   const refreshLockfile = useCallback(() => {
     if (projectRoot) {
@@ -118,6 +133,7 @@ export function App() {
     // Global keys that work in every view
     if (input === 'q') { exit(); return; }
     if (input === '?') { setShowHelp(true); return; }
+    if (input === 'R') { setView('registries'); return; }
     if (key.escape && view !== 'browse') { setView('browse'); return; }
 
     if (view !== 'browse') return;
@@ -151,6 +167,24 @@ export function App() {
     }
   });
 
+  if (loadState === 'setup') {
+    return (
+      <SetupView
+        onDone={(registries) => {
+          setLoadState('loading');
+          const root = projectRoot || getProjectRoot(process.cwd()) || process.cwd();
+          const newLockfile: Lockfile = {
+            version: 2,
+            registries,
+            installed: {},
+          };
+          writeLockfile(root, newLockfile);
+          void loadRegistry(newLockfile);
+        }}
+      />
+    );
+  }
+
   if (loadState === 'loading') {
     return (
       <Box padding={1}>
@@ -172,19 +206,53 @@ export function App() {
   if (showHelp) {
     return (
       <Box flexDirection="column" width="100%">
-        <Header viewName={viewLabels[view]} staleWarning={staleWarning} />
+        <Header viewName={viewLabels[view]} staleWarnings={staleWarnings} />
         <HelpOverlay onClose={() => setShowHelp(false)} />
       </Box>
     );
   }
 
-  if (view === 'install') {
+  if (view === 'registries') {
     return (
       <Box flexDirection="column" width="100%">
-        <Header viewName="Install" staleWarning={null} />
+        <Header viewName="Registries" staleWarnings={[]} />
+        <RegistriesView
+          lockfile={lockfile}
+          projectRoot={projectRoot}
+          assets={assets}
+          onDone={() => {
+            // User is leaving the registries view — reload from disk and navigate
+            const lf = readLockfile(projectRoot);
+            if (!lf || lf.registries.length === 0) {
+              // All registries were removed; go to setup to add a new one
+              setLockfile(lf);
+              setLoadState('setup');
+            } else {
+              setView('browse');
+              setLoadState('loading');
+              void loadRegistry(lf);
+            }
+          }}
+          onCancel={() => setView('browse')}
+        />
+      </Box>
+    );
+  }
+
+  if (view === 'install') {
+    // Determine registry info from the first asset's registryName or fallback to first configured registry
+    const firstAsset = installTargets[0];
+    const registryName = firstAsset?.registryName || lockfile?.registries[0]?.name || '';
+    const registryBaseUrl = lockfile?.registries.find((r) => r.name === registryName)?.url
+      || lockfile?.registries[0]?.url || '';
+
+    return (
+      <Box flexDirection="column" width="100%">
+        <Header viewName="Install" staleWarnings={[]} />
         <InstallView
           assets={installTargets}
           registryBaseUrl={registryBaseUrl}
+          registryName={registryName}
           projectRoot={projectRoot}
           githubToken={githubToken}
           onDone={() => { refreshLockfile(); setView('browse'); setInstallTargets([]); setSelectedItems(new Set()); }}
@@ -197,11 +265,10 @@ export function App() {
   if (view === 'updates') {
     return (
       <Box flexDirection="column" width="100%">
-        <Header viewName="Updates" staleWarning={null} />
+        <Header viewName="Updates" staleWarnings={[]} />
         <UpdateView
           assets={assets}
           lockfile={lockfile}
-          registryBaseUrl={registryBaseUrl}
           projectRoot={projectRoot}
           githubToken={githubToken}
           onDone={() => { refreshLockfile(); setView('browse'); }}
@@ -214,7 +281,7 @@ export function App() {
     if (removeTarget !== null && lockfile !== null) {
       return (
         <Box flexDirection="column" width="100%">
-          <Header viewName="Remove" staleWarning={null} />
+          <Header viewName="Remove" staleWarnings={[]} />
           <RemoveView
             assetName={removeTarget}
             lockfile={lockfile}
@@ -227,10 +294,11 @@ export function App() {
     }
     return (
       <Box flexDirection="column" width="100%">
-        <Header viewName="Installed" staleWarning={null} />
+        <Header viewName="Installed" staleWarnings={[]} />
         <InstalledView
           lockfile={lockfile}
-          onRemove={(name) => setRemoveTarget(name)}
+          projectRoot={projectRoot}
+          onRemove={(key) => setRemoveTarget(key)}
         />
         <Footer />
       </Box>
@@ -240,11 +308,10 @@ export function App() {
   if (view === 'sync') {
     return (
       <Box flexDirection="column" width="100%">
-        <Header viewName="Sync" staleWarning={null} />
+        <Header viewName="Sync" staleWarnings={[]} />
         <SyncView
           lockfile={lockfile}
           assets={assets}
-          registryBaseUrl={registryBaseUrl}
           projectRoot={projectRoot}
           githubToken={githubToken}
           onDone={() => { refreshLockfile(); setView('browse'); }}
@@ -254,9 +321,10 @@ export function App() {
   }
 
   // Browse view (default)
+  const staleWarning = staleWarnings[0] ?? null;
   return (
     <Box flexDirection="column" width="100%">
-      <Header viewName="Browse" staleWarning={staleWarning} />
+      <Header viewName="Browse" staleWarnings={staleWarnings} />
       <SearchBar
         value={search}
         onChange={setSearch}
@@ -284,7 +352,7 @@ export function App() {
         >
           <PreviewPane
             asset={filtered[selectedIndex] ?? null}
-            registryBaseUrl={registryBaseUrl}
+            registryBaseUrl={lockfile?.registries.find((r) => r.name === filtered[selectedIndex]?.registryName)?.url || lockfile?.registries[0]?.url || ''}
             githubToken={githubToken}
           />
         </Box>
@@ -294,7 +362,7 @@ export function App() {
   );
 }
 
-function Header({ viewName, staleWarning }: { viewName: string; staleWarning: string | null }) {
+function Header({ viewName, staleWarnings }: { viewName: string; staleWarnings: string[] }) {
   return (
     <Box
       borderStyle="single"
@@ -310,7 +378,9 @@ function Header({ viewName, staleWarning }: { viewName: string; staleWarning: st
         <Text dimColor> | </Text>
         <Text>{viewName}</Text>
       </Box>
-      {staleWarning && <Text color="yellow" dimColor>⚠ {staleWarning}</Text>}
+      {staleWarnings.map((w, i) => (
+        <Text key={i} color="yellow" dimColor>⚠ {w}</Text>
+      ))}
     </Box>
   );
 }
