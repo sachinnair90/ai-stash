@@ -29,6 +29,7 @@ const SQUAD_DIR = path.join(PROJECT_ROOT, '.squad');
 const OPENSPEC_DIR = path.join(PROJECT_ROOT, 'openspec');
 const CEREMONIES_FILE = path.join(SQUAD_DIR, 'ceremonies.md');
 const ROUTING_FILE = path.join(SQUAD_DIR, 'routing.md');
+const TEAM_FILE = path.join(SQUAD_DIR, 'team.md');
 const SETUP_COMPLETE = path.join(PLUGIN_DIR, '.setup-complete');
 
 const CEREMONIES_PATCH = path.join(PLUGIN_DIR, 'patches', 'ceremonies-patch.md');
@@ -36,6 +37,21 @@ const ROUTING_PATCH = path.join(PLUGIN_DIR, 'patches', 'routing-patch.md');
 
 const CEREMONY_SENTINEL = '# specship:spec-gate';
 const ROUTING_SENTINEL = '# specship:speccer';
+
+// ── Agent / skill source → dest pairs ────────────────────────────────────────
+const SPECCER_SRC  = path.join(PLUGIN_DIR, '.squad', 'agents', 'speccer');
+const SPECCER_DEST = path.join(SQUAD_DIR,  'agents', 'speccer');
+
+const SKILL_PAIRS = [
+  [
+    path.join(PLUGIN_DIR, '.squad', 'skills', 'openspec'),
+    path.join(SQUAD_DIR,  'skills', 'openspec'),
+  ],
+  [
+    path.join(PLUGIN_DIR, '.squad', 'skills', 'openspec-scribe'),
+    path.join(SQUAD_DIR,  'skills', 'openspec-scribe'),
+  ],
+];
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function run(cmd, { silent = false } = {}) {
@@ -179,17 +195,119 @@ function applyRoutingPatch() {
   return true;
 }
 
+// ── Step 7: Copy Speccer agent files into .squad/agents/ (idempotent) ────────
+function installSpeccerAgent() {
+  log('Installing Speccer agent files...');
+
+  if (fs.existsSync(SPECCER_DEST)) {
+    ok('.squad/agents/speccer/ already exists — skipping');
+    return true;
+  }
+
+  if (!fs.existsSync(SPECCER_SRC)) {
+    fail(`Speccer source files not found at ${SPECCER_SRC}`);
+    return false;
+  }
+
+  fs.mkdirSync(SPECCER_DEST, { recursive: true });
+  for (const file of fs.readdirSync(SPECCER_SRC)) {
+    fs.copyFileSync(path.join(SPECCER_SRC, file), path.join(SPECCER_DEST, file));
+  }
+
+  // Seed history.md placeholders with basic project context
+  const historyFile = path.join(SPECCER_DEST, 'history.md');
+  if (fs.existsSync(historyFile)) {
+    const { out: gitUser } = run('git config user.name', { silent: true });
+    const projectName = path.basename(PROJECT_ROOT);
+    let history = fs.readFileSync(historyFile, 'utf-8');
+    history = history
+      .replace('{user name}', gitUser || 'Unknown')
+      .replace('{project description}', projectName)
+      .replace('{languages, frameworks, tools}', 'see package.json')
+      .replace('{timestamp}', new Date().toISOString().slice(0, 10));
+    fs.writeFileSync(historyFile, history, 'utf-8');
+  }
+
+  ok('Speccer agent files installed to .squad/agents/speccer/');
+  return true;
+}
+
+// ── Step 8: Copy OpenSpec skills into .squad/skills/ (idempotent) ────────────
+function installOpenSpecSkills() {
+  log('Installing OpenSpec skills...');
+
+  for (const [src, dest] of SKILL_PAIRS) {
+    const skillName = path.basename(dest);
+    if (fs.existsSync(dest)) {
+      ok(`.squad/skills/${skillName}/ already exists — skipping`);
+      continue;
+    }
+    if (!fs.existsSync(src)) {
+      warn(`Skill source not found: ${src} — skipping`);
+      continue;
+    }
+    fs.mkdirSync(dest, { recursive: true });
+    for (const file of fs.readdirSync(src)) {
+      fs.copyFileSync(path.join(src, file), path.join(dest, file));
+    }
+    ok(`.squad/skills/${skillName}/ installed`);
+  }
+
+  return true;
+}
+
+// ── Step 9: Register Speccer in team.md (idempotent) ─────────────────────────
+function registerSpeccerInTeam() {
+  log('Registering Speccer in team.md...');
+
+  if (!fs.existsSync(TEAM_FILE)) {
+    warn('team.md not found — Speccer will not appear in the team roster');
+    warn('This is non-fatal. Run `squad init` and re-run this script to register.');
+    return true; // non-fatal: team.md may not exist when squad init hasn't run yet
+  }
+
+  const team = fs.readFileSync(TEAM_FILE, 'utf-8');
+  if (team.toLowerCase().includes('speccer')) {
+    ok('Speccer already listed in team.md — skipping');
+    return true;
+  }
+
+  // Insert after the Members table header row (handles both separator styles)
+  const MEMBERS_HEADER = /(\| *Name *\| *Role *\| *Charter *\| *Status *\|\n\|[-| ]+\|)/;
+  const match = MEMBERS_HEADER.exec(team);
+  if (match) {
+    const entry = '\n| Speccer | Spec Lead | `.squad/agents/speccer/charter.md` | active |';
+    const updated = team.slice(0, match.index + match[0].length) + entry + team.slice(match.index + match[0].length);
+    fs.writeFileSync(TEAM_FILE, updated, 'utf-8');
+  } else {
+    // Fallback: append under ## Members if header parsing fails
+    const updated = team.replace(/^(## Members\s*\n)/m, `$1\n| Speccer | Spec Lead | \`.squad/agents/speccer/charter.md\` | active |\n`);
+    if (updated !== team) {
+      fs.writeFileSync(TEAM_FILE, updated, 'utf-8');
+    } else {
+      warn('Could not locate ## Members in team.md — appending Speccer entry at end');
+      fs.appendFileSync(TEAM_FILE, '\n| Speccer | Spec Lead | `.squad/agents/speccer/charter.md` | active |\n', 'utf-8');
+    }
+  }
+
+  ok('Speccer registered in team.md');
+  return true;
+}
+
 // ── Main ─────────────────────────────────────────────────────────────────────
 function main() {
   console.log('\nspecship setup\n' + '─'.repeat(40));
 
   const steps = [
-    ['Verify Squad CLI',          checkSquad],
-    ['Verify OpenSpec CLI',       checkOpenSpec],
-    ['Init .squad/',              initSquad],
-    ['Init openspec/',            initOpenSpec],
-    ['Apply ceremony patch',      applyCeremonyPatch],
-    ['Apply routing patch',       applyRoutingPatch],
+    ['Verify Squad CLI',           checkSquad],
+    ['Verify OpenSpec CLI',        checkOpenSpec],
+    ['Init .squad/',               initSquad],
+    ['Init openspec/',             initOpenSpec],
+    ['Install Speccer agent',      installSpeccerAgent],
+    ['Install OpenSpec skills',    installOpenSpecSkills],
+    ['Apply ceremony patch',       applyCeremonyPatch],
+    ['Apply routing patch',        applyRoutingPatch],
+    ['Register Speccer in team',   registerSpeccerInTeam],
   ];
 
   for (const [label, fn] of steps) {
@@ -205,9 +323,8 @@ function main() {
 
   console.log('\n' + '─'.repeat(40));
   console.log('✅ specship setup complete\n');
-  console.log('Next step: add the Speccer to your Squad team.');
-  console.log('Tell your Squad coordinator: "Add a Spec Lead to the team"');
-  console.log('The coordinator will cast a name and seed the Speccer\'s history.\n');
+  console.log('The Speccer is now on your Squad team.');
+  console.log('Any "build X" or "add X" request will trigger the spec-gate ceremony automatically.\n');
 }
 
 main();

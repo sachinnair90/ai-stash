@@ -22,6 +22,7 @@ const PROJECT_ROOT = process.cwd();
 const SQUAD_DIR = path.join(PROJECT_ROOT, '.squad');
 const CEREMONIES_FILE = path.join(SQUAD_DIR, 'ceremonies.md');
 const ROUTING_FILE = path.join(SQUAD_DIR, 'routing.md');
+const TEAM_FILE = path.join(SQUAD_DIR, 'team.md');
 const SPECCER_DIR = path.join(SQUAD_DIR, 'agents', 'speccer');
 const ALUMNI_DIR = path.join(SQUAD_DIR, 'agents', '_alumni', 'speccer');
 const SETUP_COMPLETE = path.join(PLUGIN_DIR, '.setup-complete');
@@ -101,7 +102,27 @@ function archiveSpeccer() {
   ok('Speccer archived to .squad/agents/_alumni/speccer/ (history preserved)');
 }
 
-// ── Step 4: Remove .setup-complete ───────────────────────────────────────────
+// ── Step 4: Remove Speccer from team.md ──────────────────────────────────────
+function deregisterSpeccerFromTeam() {
+  log('Removing Speccer from team.md...');
+
+  if (!fs.existsSync(TEAM_FILE)) {
+    ok('team.md not found — nothing to remove');
+    return;
+  }
+
+  const content = fs.readFileSync(TEAM_FILE, 'utf-8');
+  // Remove the line that contains the Speccer entry in the Members table
+  const updated = content.split('\n').filter(line => !/^\|\s*Speccer\s*\|/i.test(line)).join('\n');
+  if (updated !== content) {
+    fs.writeFileSync(TEAM_FILE, updated, 'utf-8');
+    ok('Speccer removed from team.md');
+  } else {
+    ok('Speccer not found in team.md — already clean');
+  }
+}
+
+// ── Step 5: Remove .setup-complete ───────────────────────────────────────────
 function removeSetupComplete() {
   log('Removing .setup-complete...');
   if (fs.existsSync(SETUP_COMPLETE)) {
@@ -117,10 +138,11 @@ function main() {
   console.log('\nspecship cleanup\n' + '─'.repeat(40));
 
   const steps = [
-    ['Remove ceremony patch',  removeCeremonyPatch],
-    ['Remove routing patch',   removeRoutingPatch],
-    ['Archive Speccer agent',  archiveSpeccer],
-    ['Remove .setup-complete', removeSetupComplete],
+    ['Remove ceremony patch',        removeCeremonyPatch],
+    ['Remove routing patch',         removeRoutingPatch],
+    ['Archive Speccer agent',        archiveSpeccer],
+    ['Deregister Speccer from team', deregisterSpeccerFromTeam],
+    ['Remove .setup-complete',       removeSetupComplete],
   ];
 
   for (const [label, fn] of steps) {
