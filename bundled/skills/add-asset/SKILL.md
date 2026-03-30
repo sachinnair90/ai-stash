@@ -37,11 +37,6 @@ For folder-based asset types (`hook`, `mcp-server`, `plugin`), ask these additio
 2. **Setup script**: Does it need a setup step that can't be expressed declaratively (e.g. `npm install`, service registration, writing config files)?
    - If yes → leads to `scripts.postInstall` in `manifest.json`
    - Scripts must be `.js` or `.mjs` (Node.js only for cross-platform consistency)
-   - **When any `scripts` field is declared, you MUST collect `SCRIPT_RISKS.md` content from the author before proceeding.** Ask:
-     - What does the script install, modify, or create on the developer's system?
-     - What environment variables or secrets does it consume at runtime?
-     - What should the developer do to undo the script's effects if they want to remove the asset?
-   - If `scripts.postInstall` is declared **without** `scripts.postUninstall`: the author MUST include a **"No cleanup script"** section in `SCRIPT_RISKS.md` describing what the developer must manually undo (e.g. "Run `npm uninstall -g xyz` and delete `~/.config/xyz/`").
 
 3. **Configured files**: Will the setup step produce any output files containing user-specific values (e.g. generated config files, `.env` files)?
    - If yes → leads to `configuredFiles` in `manifest.json`
@@ -195,25 +190,6 @@ Rules:
 - `configuredFiles` is optional — omit entirely if no user-specific output files
 - `configStable` is optional — omit or set to `true` if config values are safe across versions
 - When `scripts.postInstall` is present, **always** include `.setup-complete` in `configuredFiles` (even if the author didn't mention it)
-- When any `scripts` field is declared, **always** set `"scriptRisks": "{bucket}/{name}/SCRIPT_RISKS.md"` in `manifest.json`
-
-**When scripts are declared, generate `SCRIPT_RISKS.md`** alongside the manifest (task 11.3). Use the content collected during the Phase 1 interview. Structure it as:
-
-```markdown
-# Script Risks — {asset name}
-
-## What the script does
-{Describe what postInstall installs, modifies, or creates}
-
-## Secrets and environment variables consumed
-{List env vars the script reads, or "None"}
-
-## How to undo
-{Steps to manually reverse the script's effects}
-
-## No cleanup script
-{Include this section ONLY if postUninstall is absent. Describe manual cleanup steps.}
-```
 
 **hook** — folder-based
 
@@ -333,7 +309,6 @@ Rules:
 - `tags`: include relevant tool names and workflow keywords
 - `targets`: only list tools whose adapters actually handle this asset type
 - Do **not** include `files[]` or `manifestUrl` for folder-based entries — the engine fetches `manifest.json` from the `folder` path
-- When any `scripts` field is declared, **always** add `"hasScripts": true` to the registry.json entry; this enables the ⚙ badge in the TUI Browse view and the `[has scripts]` annotation in `ai-stash list` output
 
 ---
 

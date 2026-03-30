@@ -122,16 +122,23 @@ export async function planInstall(
     throw new Error(`Asset "${asset.name}" has neither a 'file' nor a 'folder' field`);
   }
 
-  // Fetch SCRIPT_RISKS.md content if declared in manifest
+  // For folder-based assets, manifest.files and scriptRisks paths are relative to the folder,
+  // not the registry root. Compute a folder-scoped base URL so relative paths resolve correctly.
+  const fileBaseUrl = asset.folder
+    ? new URL(`${asset.folder}/`, registryBaseUrl).href
+    : registryBaseUrl;
+
+  // Fetch SCRIPT_RISKS.md content if declared in manifest (path relative to folder)
   let scriptRisksContent: string | undefined;
   if (manifest?.scriptRisks) {
-    const content = await fetchScriptRisks(registryBaseUrl, manifest.scriptRisks, githubToken);
+    const content = await fetchScriptRisks(fileBaseUrl, manifest.scriptRisks, githubToken);
     scriptRisksContent = content ?? undefined;
   }
 
   // Fetch all asset files from registry
-  const rawFiles: Record<string, string> = {};  for (const filePath of filesToFetch) {
-    rawFiles[filePath] = await fetchAssetFile(registryBaseUrl, filePath, githubToken);
+  const rawFiles: Record<string, string> = {};
+  for (const filePath of filesToFetch) {
+    rawFiles[filePath] = await fetchAssetFile(fileBaseUrl, filePath, githubToken);
   }
 
   // Collect userConfig if manifest declares it (task 5.1)
