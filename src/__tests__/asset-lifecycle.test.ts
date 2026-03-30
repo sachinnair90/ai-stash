@@ -249,9 +249,7 @@ describe('install engine – folder-based asset', () => {
       description: 'Test MCP server',
       tags: ['test'],
       targets: ['claude-code'] as string[],
-      files: [] as string[],
       folder: 'mcp-servers/test-mcp',
-      manifestUrl: '',
       registryName: 'community',
     };
 
@@ -366,9 +364,7 @@ describe('update engine – reconfiguration flag', () => {
       description: 'Test',
       tags: ['test'],
       targets: ['claude-code'] as string[],
-      files: [] as string[],
       folder: 'mcp-servers/test-mcp',
-      manifestUrl: '',
       registryName: 'community',
     };
 
@@ -445,9 +441,7 @@ describe('update engine – reconfiguration flag', () => {
       description: 'Test',
       tags: ['test'],
       targets: ['claude-code'] as string[],
-      files: [] as string[],
       folder: 'mcp-servers/test-mcp-stable',
-      manifestUrl: '',
       registryName: 'community',
     };
 

@@ -113,8 +113,13 @@ export async function planInstall(
   if (asset.folder) {
     manifest = await fetchManifest(registryBaseUrl, asset.folder, githubToken);
     filesToFetch = manifest.files;
+    // Populate asset.files from manifest so adapters can reference it
+    asset = { ...asset, files: filesToFetch };
+  } else if (asset.file) {
+    filesToFetch = [asset.file];
+    asset = { ...asset, files: filesToFetch };
   } else {
-    filesToFetch = asset.files;
+    throw new Error(`Asset "${asset.name}" has neither a 'file' nor a 'folder' field`);
   }
 
   // Fetch SCRIPT_RISKS.md content if declared in manifest
@@ -524,7 +529,7 @@ export async function installAsset(
     lockfile,
   );
 
-  const fileStatuses: InstallFileStatus[] = asset.files.map((f) => ({
+  const fileStatuses: InstallFileStatus[] = (asset.files ?? (asset.file ? [asset.file] : [])).map((f) => ({
     file: f,
     status: 'pending' as const,
   }));

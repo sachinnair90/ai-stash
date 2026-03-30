@@ -21,8 +21,7 @@ const mockAsset: RegistryAsset = {
   description: 'Integration test skill',
   tags: ['test'],
   targets: ['claude-code'],
-  files: ['main.md'],
-  manifestUrl: 'https://example.com/manifest.json',
+  file: 'main.md',
   registryName: 'community',
 };
 

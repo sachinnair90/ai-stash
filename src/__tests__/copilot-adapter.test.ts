@@ -15,7 +15,6 @@ function makeAsset(overrides: Partial<RegistryAsset> = {}): RegistryAsset {
     tags: [],
     targets: ['copilot'],
     files: ['main.md'],
-    manifestUrl: 'https://example.com/manifest.json',
     registryName: 'test',
     ...overrides,
   };
@@ -45,10 +44,34 @@ describe('getInstallPaths', () => {
     expect(paths).toEqual(['/project/AGENTS.md']);
   });
 
-  it('returns correct paths for hook', () => {
+  it('returns correct paths for hook (old-style)', () => {
     const asset = makeAsset({ type: 'hook' });
     const paths = copilotAdapter.getInstallPaths(asset, 'project', projectRoot);
     expect(paths).toEqual(['/project/.github/hooks/hooks.json']);
+  });
+
+  it('returns multi-file paths for hook with copilot-hooks.json (new-style)', () => {
+    const asset = makeAsset({
+      type: 'hook',
+      files: [
+        'hook-config.json',
+        'copilot-hooks.json',
+        'hooks/track-ai-edits.mjs',
+        'hooks/session-stop.mjs',
+        'hooks/session-start.mjs',
+        'scripts/prepare-commit-msg.mjs',
+        'scripts/post-commit.mjs',
+      ],
+    });
+    const paths = copilotAdapter.getInstallPaths(asset, 'project', projectRoot);
+    expect(paths).toEqual([
+      '/project/.github/hooks/hooks.json',
+      '/project/.github/hooks/track-ai-edits.mjs',
+      '/project/.github/hooks/session-stop.mjs',
+      '/project/.github/hooks/session-start.mjs',
+      '/project/.github/hooks/git/prepare-commit-msg.mjs',
+      '/project/.github/hooks/git/post-commit.mjs',
+    ]);
   });
 
   it('returns correct paths for command', () => {
@@ -108,6 +131,25 @@ describe('transformFiles', () => {
     expect(transformed.hooks[0]).not.toHaveProperty('command');
     expect(transformed.hooks[1].event).toBe('postToolUse');
     expect(transformed.hooks[1].bash).toBe('npm test');
+  });
+
+  it('passes through copilot-hooks.json and scripts unchanged for new-style hook', () => {
+    const asset = makeAsset({
+      type: 'hook',
+      files: ['hook-config.json', 'copilot-hooks.json', 'hooks/track.mjs', 'scripts/prepare-commit-msg.mjs'],
+    });
+    const copilotHooks = JSON.stringify({ version: 1, hooks: { postToolUse: [{ bash: 'node .github/hooks/track.mjs' }] } });
+    const files = {
+      'hook-config.json': '{"hooks":[]}',
+      'copilot-hooks.json': copilotHooks,
+      'hooks/track.mjs': '// track',
+      'scripts/prepare-commit-msg.mjs': '// commit msg',
+    };
+    const result = copilotAdapter.transformFiles(asset, files);
+    expect(result).not.toHaveProperty('hook-config.json');
+    expect(result['copilot-hooks.json']).toBe(copilotHooks);
+    expect(result['hooks/track.mjs']).toBe('// track');
+    expect(result['scripts/prepare-commit-msg.mjs']).toBe('// commit msg');
   });
 
   it('replaces $ARGUMENTS with ${input:args} for command', () => {
@@ -181,6 +223,36 @@ describe('mergeIntoExisting - mcp-server', () => {
     const parsed = JSON.parse(result) as { servers: Record<string, unknown> };
     expect(parsed.servers).toHaveProperty('existing');
     expect(parsed.servers).toHaveProperty('github');
+  });
+});
+
+describe('mergeIntoExisting - hook (new-style)', () => {
+  it('merges object-keyed hooks.json by event + bash dedup', () => {
+    const existing = JSON.stringify({
+      version: 1,
+      hooks: { postToolUse: [{ bash: 'node .github/hooks/other.mjs' }] },
+    });
+    const incoming = JSON.stringify({
+      version: 1,
+      hooks: {
+        sessionStart: [{ bash: 'node .github/hooks/session-start.mjs' }],
+        postToolUse: [{ bash: 'node .github/hooks/track-ai-edits.mjs' }],
+      },
+    });
+    const result = copilotAdapter.mergeIntoExisting('ai-coauthor-hook', existing, incoming, 'hook');
+    const parsed = JSON.parse(result) as { version: number; hooks: Record<string, unknown[]> };
+    expect(parsed.hooks.sessionStart).toHaveLength(1);
+    expect(parsed.hooks.postToolUse).toHaveLength(2);   // existing + new, no dup
+  });
+
+  it('does not duplicate entries when re-installing', () => {
+    const hooksJson = JSON.stringify({
+      version: 1,
+      hooks: { postToolUse: [{ bash: 'node .github/hooks/track-ai-edits.mjs' }] },
+    });
+    const result = copilotAdapter.mergeIntoExisting('ai-coauthor-hook', hooksJson, hooksJson, 'hook');
+    const parsed = JSON.parse(result) as { hooks: { postToolUse: unknown[] } };
+    expect(parsed.hooks.postToolUse).toHaveLength(1);
   });
 });
 

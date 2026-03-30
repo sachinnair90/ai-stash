@@ -21,12 +21,13 @@ export function PreviewPane({ asset, registryBaseUrl, githubToken }: PreviewPane
     setError(null);
     setScrollOffset(0);
 
-    if (!asset || asset.files.length === 0) return;
+    const previewFile = asset?.file ?? asset?.files?.[0];
+    if (!asset || !previewFile) return;
 
     let cancelled = false;
     setLoading(true);
 
-    fetchAssetFile(registryBaseUrl, asset.files[0], githubToken)
+    fetchAssetFile(registryBaseUrl, previewFile, githubToken)
       .then((text) => {
         if (!cancelled) {
           setContent(text);

@@ -65,8 +65,7 @@ const mockAssets: RegistryAsset[] = [
     description: 'Test skill',
     tags: ['git'],
     targets: ['claude-code'],
-    files: ['assets/git-commit/SKILL.md'],
-    manifestUrl: 'https://example.com/manifest.json',
+    file: 'assets/git-commit/SKILL.md',
     registryName: 'community',
   },
 ];

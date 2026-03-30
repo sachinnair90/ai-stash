@@ -14,7 +14,7 @@ export const claudeCodeAdapter: Adapter = {
 
     switch (assetType) {
       case 'skill':
-        return asset.files.map(f => path.join(base, 'skills', asset.name, path.basename(f)));
+        return (asset.files ?? []).map(f => path.join(base, 'skills', asset.name, path.basename(f)));
       case 'agent':
         return [path.join(base, 'agents', `${asset.name}.md`)];
       case 'instruction': {
@@ -24,12 +24,18 @@ export const claudeCodeAdapter: Adapter = {
       case 'hook':
         return [
           path.join(base, 'settings.json'),
-          ...asset.files.filter(f => path.basename(f) !== 'hook-config.json').map(f => path.join(base, 'hooks', asset.name, path.basename(f))),
+          ...(asset.files ?? []).filter(f => {
+            const basename = path.basename(f);
+            return basename !== 'hook-config.json'
+              && basename !== 'copilot-hooks.json'
+              && basename !== 'session-start.mjs'
+              && !f.startsWith('scripts/');
+          }).map(f => path.join(base, 'hooks', asset.name, path.basename(f))),
         ];
       case 'command':
         return [path.join(base, 'skills', asset.name, 'SKILL.md')];
       case 'plugin':
-        return asset.files.map(f => {
+        return (asset.files ?? []).map(f => {
           const rel = f.replace(new RegExp(`^plugins/${asset.name}/`), '');
           return path.join(base, 'plugins', asset.name, rel);
         });
@@ -62,6 +68,9 @@ export const claudeCodeAdapter: Adapter = {
             // hook-config.json is used to merge into settings.json, not written directly
             continue;
           }
+          if (filePath.endsWith('copilot-hooks.json')) continue;
+          if (path.basename(filePath) === 'session-start.mjs') continue;
+          if (filePath.startsWith('scripts/')) continue;
           result[filePath] = content;
         }
         return result;

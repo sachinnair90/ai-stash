@@ -27,8 +27,7 @@ const nestedRegistry: NestedRegistryIndex = {
       description: 'A test asset',
       tags: ['test'],
       targets: ['claude-code'],
-      files: ['skills/test-asset/main.md'],
-      manifestUrl: 'https://example.com/manifest.json',
+      file: 'skills/test-asset/main.md',
     },
   ],
   commands: [
@@ -38,8 +37,7 @@ const nestedRegistry: NestedRegistryIndex = {
       description: 'A test command',
       tags: ['test'],
       targets: ['claude-code'],
-      files: ['commands/test-command/command.md'],
-      manifestUrl: 'https://example.com/manifest.json',
+      file: 'commands/test-command/command.md',
     },
   ],
   plugins: [
@@ -49,8 +47,7 @@ const nestedRegistry: NestedRegistryIndex = {
       description: 'A test plugin',
       tags: ['test'],
       targets: ['claude-code'],
-      files: ['plugins/test-plugin/.claude-plugin/plugin.json'],
-      manifestUrl: 'https://example.com/manifest.json',
+      folder: 'plugins/test-plugin',
     },
   ],
   mcpServers: [
@@ -60,8 +57,7 @@ const nestedRegistry: NestedRegistryIndex = {
       description: 'A test MCP server',
       tags: ['test'],
       targets: ['claude-code'],
-      files: ['mcp-servers/test-mcp/mcp.json'],
-      manifestUrl: 'https://example.com/manifest.json',
+      folder: 'mcp-servers/test-mcp',
     },
   ],
 };
@@ -78,8 +74,7 @@ const sampleRegistry: RegistryIndex = {
       description: 'A test asset',
       tags: ['test'],
       targets: ['claude-code'],
-      files: ['skills/test-asset/main.md'],
-      manifestUrl: 'https://example.com/manifest.json',
+      file: 'skills/test-asset/main.md',
       registryName: '',
     },
   ],
@@ -120,8 +115,7 @@ describe('fetchRegistry', () => {
           description: 'A legacy prompt',
           tags: [],
           targets: ['claude-code'],
-          files: ['prompts/legacy-prompt/prompt.md'],
-          manifestUrl: 'https://example.com/manifest.json',
+          file: 'prompts/legacy-prompt/prompt.md',
         },
       ],
     };
@@ -234,7 +228,7 @@ describe('getRegistries — multi-registry fetch', () => {
         json: async () => ({
           version: 1,
           generatedAt: '2026-01-01T00:00:00Z',
-          skills: [{ name: 'test-asset', version: '1.0.0', description: 'x', tags: [], targets: ['claude-code'], files: [], manifestUrl: '' }],
+          skills: [{ name: 'test-asset', version: '1.0.0', description: 'x', tags: [], targets: ['claude-code'], file: 'skills/test-asset/main.md' }],
         }),
       }),
     );
@@ -285,7 +279,7 @@ describe('getRegistries — multi-registry fetch', () => {
           json: async () => ({
             version: 1,
             generatedAt: '2026-01-01T00:00:00Z',
-            skills: [{ name: 'asset-a', version: '1.0.0', description: 'x', tags: [], targets: [], files: [], manifestUrl: '' }],
+            skills: [{ name: 'asset-a', version: '1.0.0', description: 'x', tags: [], targets: [], file: 'skills/asset-a/main.md' }],
           }),
         })
         .mockRejectedValueOnce(new Error('Network error')),

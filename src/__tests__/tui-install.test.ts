@@ -33,8 +33,7 @@ const sampleSkill: RegistryAsset = {
   description: 'Craft conventional commit messages',
   tags: ['git'],
   targets: ['claude-code'],
-  files: ['assets/git-commit/SKILL.md'],
-  manifestUrl: 'assets/git-commit/SKILL.md',
+  file: 'assets/git-commit/SKILL.md',
   registryName: 'test',
 };
 
@@ -45,8 +44,7 @@ const sampleAgent: RegistryAsset = {
   description: 'A debugging agent',
   tags: ['debug'],
   targets: ['claude-code'],
-  files: ['assets/debug-agent/AGENT.md'],
-  manifestUrl: 'assets/debug-agent/AGENT.md',
+  file: 'assets/debug-agent/AGENT.md',
   registryName: 'test',
 };
 

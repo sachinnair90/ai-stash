@@ -5,11 +5,10 @@ export interface RegistryAsset {
   description: string;
   tags: string[];
   targets: string[];
-  /** Registry-root-relative paths, e.g. "skills/foo/main.md" */
-  files: string[];
-  manifestUrl: string;
   /** Single file path for simple assets (skill, agent, instruction, command) */
   file?: string;
+  /** Engine-internal: file list populated by planInstall before calling adapters */
+  files?: string[];
   /** Folder path for complex assets (hook, mcp-server, plugin) — engine fetches manifest.json from here */
   folder?: string;
   /** Name of the source registry (populated after multi-registry merge) */
