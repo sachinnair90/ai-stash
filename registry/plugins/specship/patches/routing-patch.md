@@ -1,31 +1,20 @@
 # specship:speccer
-# This block was appended by the specship plugin post-install script.
+# This block was inserted by the specship plugin post-install script.
 # To remove: run the specship postUninstall script, or delete everything
 # between the specship:speccer and /specship:speccer sentinels.
 
-## Spec Gate — Feature Implementation Rule
+## ⛔ Spec Gate — Check This First
 
-> **Before routing any feature implementation request** ("build X", "add X", "implement X",
-> "create X", "new feature") to a developer agent, you MUST check `ceremonies.md` for the
-> spec-gate ceremony.
+**If the request is a new feature** ("build X", "add X", "implement X", "create X", "I want X to do Y"):
 
-Do NOT spawn a developer until either:
+1. Check whether `openspec/changes/` contains a `tasks.md` for this feature.
+   - **Yes** → proceed to the routing table below.
+   - **No** → STOP. Route to **Speccer**. Do not spawn any developer until Speccer has produced a spec and the user has approved it.
 
-- a `tasks.md` already exists in `openspec/changes/` for this feature (spec approved), OR
-- the spec-gate ceremony has completed and the developer has approved the spec.
+This check runs before anything else. Eager execution does not apply here — a feature without a spec does not get built.
 
-> This rule takes precedence over general work routing. Routing to a developer before a spec
-> is approved is not permitted when the spec-gate ceremony is enabled.
+> Exceptions: bug fixes, refactors, chores, docs-only changes, dependency updates.
 
-## Speccer Routing
-
-> This table covers direct Speccer routing — cases where the developer is explicitly asking
-> about specs. Feature implementation requests go through the spec-gate rule above, not here.
-
-| Work Type | Route To | Examples |
-| --------- | -------- | -------- |
-| Direct spec request | Speccer | "spec X", "write a spec for X", "spec out X" |
-| Spec status check | Speccer | "is X specced?", "do we have a spec for X?" |
-| Explicit explore | Speccer | "explore X" before any spec exists |
+---
 
 # /specship:speccer

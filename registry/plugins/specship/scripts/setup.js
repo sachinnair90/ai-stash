@@ -154,44 +154,82 @@ function initOpenSpec() {
 }
 
 // ── Step 5: Apply ceremony patch (idempotent) ─────────────────────────────────
+// Inserts spec-gate as the FIRST ceremony so it is evaluated before Design Review.
+// Anchors to the header note line if present, otherwise the first ## heading.
 function applyCeremonyPatch() {
   log('Applying spec-gate ceremony patch...');
 
   if (!fs.existsSync(CEREMONIES_FILE)) {
     warn('.squad/ceremonies.md not found — creating it');
-    fs.writeFileSync(CEREMONIES_FILE, '# Ceremonies\n\n', 'utf-8');
+    fs.writeFileSync(CEREMONIES_FILE, '# Ceremonies\n\n> Team meetings that happen before or after work. Each squad configures their own.\n> Ceremonies are evaluated top-to-bottom. The first matching `before` ceremony runs before work is spawned.\n\n', 'utf-8');
   }
 
-  const existing = fs.readFileSync(CEREMONIES_FILE, 'utf-8');
+  let existing = fs.readFileSync(CEREMONIES_FILE, 'utf-8');
   if (existing.includes(CEREMONY_SENTINEL)) {
     ok('spec-gate ceremony already present — skipping');
     return true;
   }
 
+  // Add evaluation-order note to header if missing
+  if (!existing.includes('evaluated top-to-bottom')) {
+    existing = existing.replace(
+      /^(#[^\n]+\n(?:>[^\n]*\n)*)/,
+      (match) => match.trimEnd() + '\n> Ceremonies are evaluated top-to-bottom. The first matching `before` ceremony runs before work is spawned.\n'
+    );
+  }
+
   const patch = fs.readFileSync(CEREMONIES_PATCH, 'utf-8');
-  fs.appendFileSync(CEREMONIES_FILE, '\n' + patch + '\n', 'utf-8');
-  ok('spec-gate ceremony appended to .squad/ceremonies.md');
+
+  // Insert before the first ## heading so spec-gate is first
+  const firstHeading = existing.match(/^## /m);
+  if (firstHeading) {
+    const idx = existing.indexOf(firstHeading[0]);
+    existing = existing.slice(0, idx) + patch + '\n' + existing.slice(idx);
+  } else {
+    existing = existing.trimEnd() + '\n\n' + patch + '\n';
+  }
+
+  fs.writeFileSync(CEREMONIES_FILE, existing, 'utf-8');
+  ok('spec-gate ceremony inserted at top of .squad/ceremonies.md');
   return true;
 }
 
 // ── Step 6: Apply routing patch (idempotent) ──────────────────────────────────
+// Inserts spec-gate preamble BEFORE ## Routing Table so it is read first.
 function applyRoutingPatch() {
   log('Applying Speccer routing patch...');
 
   if (!fs.existsSync(ROUTING_FILE)) {
     warn('.squad/routing.md not found — creating it');
-    fs.writeFileSync(ROUTING_FILE, '# Routing\n\n', 'utf-8');
+    fs.writeFileSync(ROUTING_FILE, '# Work Routing\n\nHow to decide who handles what.\n\n', 'utf-8');
   }
 
-  const existing = fs.readFileSync(ROUTING_FILE, 'utf-8');
+  let existing = fs.readFileSync(ROUTING_FILE, 'utf-8');
   if (existing.includes(ROUTING_SENTINEL)) {
     ok('Speccer routing entry already present — skipping');
     return true;
   }
 
   const patch = fs.readFileSync(ROUTING_PATCH, 'utf-8');
-  fs.appendFileSync(ROUTING_FILE, '\n' + patch + '\n', 'utf-8');
-  ok('Speccer routing entry appended to .squad/routing.md');
+
+  // Insert before ## Routing Table (or ## Routing) so preamble is read first
+  const tableHeading = existing.match(/^## Routing(?: Table)?\b/m);
+  if (tableHeading) {
+    const idx = existing.indexOf(tableHeading[0]);
+    existing = existing.slice(0, idx) + patch + '\n' + existing.slice(idx);
+  } else {
+    // Fallback: insert before first ## heading
+    const firstHeading = existing.match(/^## /m);
+    if (firstHeading) {
+      const idx = existing.indexOf(firstHeading[0]);
+      existing = existing.slice(0, idx) + patch + '\n' + existing.slice(idx);
+    } else {
+      existing = existing.trimEnd() + '\n\n' + patch + '\n';
+    }
+  }
+
+  fs.writeFileSync(ROUTING_FILE, existing, 'utf-8');
+  ok('Speccer routing patch inserted before routing table in .squad/routing.md');
   return true;
 }
 
