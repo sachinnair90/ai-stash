@@ -18,10 +18,14 @@
 **Flow:**
 
 1. Check `openspec/changes/` — if a `tasks.md` already exists for this feature, the spec is approved. Skip the ceremony and proceed to implementation.
-2. Spawn Speccer (sync) with the user's feature description. Speccer assesses clarity internally: clear idea → writes artifacts directly; vague idea → enters OpenSpec explore mode, loops until user types `/propose`.
-3. Speccer writes `proposal.md`, `design.md`, `specs/`, and `tasks.md` under `openspec/changes/{feature-name}/`.
-4. Present a proposal summary to the user (Why in 1–2 sentences, What changes as a bullet list, task count from `tasks.md`). Ask: *"Approve this spec and start implementation?"* — Yes, proceed / Request changes / Cancel.
-5. On approval: pass the feature name and `tasks.md` path to the Coordinator. Add to all implementation spawn prompts: `INPUT ARTIFACTS: openspec/changes/{feature-name}/specs/` and `Relevant skill: .squad/skills/openspec/SKILL.md — read before starting`.
+2. Spawn Speccer (sync) with only the user's raw words and project context. Do NOT pre-fill design decisions, schema choices, endpoint names, component names, or technical answers — those are Speccer's domain. Speccer's first step is a clarity assessment; if the idea is vague, Speccer enters explore mode and asks the user focused questions before writing anything.
+3. **⛔ HARD STOP after Speccer finishes.** Do NOT proceed to implementation. Do NOT spawn any developer agent.
+4. Present the spec summary to the user (Why in 1–2 sentences, What changes as a bullet list, task count from `tasks.md`). Ask: *"Approve this spec and start implementation? (Yes / Request changes / Cancel)"*
+   - **Approved** → pass feature name and `tasks.md` path to the Coordinator. Add to all implementation spawn prompts: `INPUT ARTIFACTS: openspec/changes/{feature-name}/specs/` and `Relevant skill: .squad/skills/openspec/SKILL.md — read before starting`.
+   - **Changes requested** → loop back to Speccer.
+   - **Cancelled** → stop entirely.
+
+> Speccer finishing ≠ spec approved. Approval is a separate explicit action from the user.
 
 ---
 
