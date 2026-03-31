@@ -33,7 +33,7 @@
 
 ## 5. Verify end-to-end
 
-- [ ] 5.1 Push a test tag (e.g., `v0.1.0`) to the repository and confirm the workflow runs successfully in the Actions tab
-- [ ] 5.2 Confirm the package appears under the repository's "Packages" section on GitHub
-- [ ] 5.3 Test installation: configure `.npmrc` with the scope and run `npm install @<owner>/ai-stash` in a fresh directory
-- [ ] 5.4 Confirm the CI badge and version badge render correctly on the GitHub repository README page
+- [x] 5.1 Push a test tag (e.g., `v0.1.0`) to the repository and confirm the workflow runs successfully in the Actions tab
+- [x] 5.2 Confirm the package appears under the repository's "Packages" section on GitHub
+- [x] 5.3 Test installation: configure `.npmrc` with the scope and run `npm install @<owner>/ai-stash` in a fresh directory
+- [x] 5.4 Confirm the CI badge and version badge render correctly on the GitHub repository README page
