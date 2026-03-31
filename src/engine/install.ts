@@ -336,9 +336,21 @@ export async function executeInstall(
   // Build script notice for postInstall (task 6.1-6.2)
   let scriptNotice: string | undefined;
   if (plan.manifest?.scripts?.postInstall) {
-    // Determine the installed folder path from the first installed file
-    const firstFile = installedFiles[0];
-    const assetDir = firstFile ? path.dirname(path.join(projectRoot, firstFile)) : projectRoot;
+    // Determine the asset root by finding the common directory prefix of all
+    // installed files. This handles folder-based assets (e.g. plugins) where
+    // files are nested in subdirectories and the script path is relative to
+    // the asset's top-level install folder, not to any individual file's dir.
+    let assetDir = projectRoot;
+    if (installedFiles.length > 0) {
+      const dirParts = installedFiles.map(f => path.dirname(path.join(projectRoot, f)).split(path.sep));
+      let common = dirParts[0];
+      for (const parts of dirParts.slice(1)) {
+        let i = 0;
+        while (i < common.length && i < parts.length && common[i] === parts[i]) i++;
+        common = common.slice(0, i);
+      }
+      if (common.length > 0) assetDir = common.join(path.sep);
+    }
     const scriptPath = path.join(assetDir, plan.manifest.scripts.postInstall);
     scriptNotice = buildScriptNotice(scriptPath, 'install');
   }

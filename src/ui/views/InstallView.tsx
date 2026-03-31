@@ -241,6 +241,7 @@ export function InstallView({ assets, onDone, onCancel, registryBaseUrl, registr
           assetName={plan.asset.name}
           scripts={scriptNames}
           scriptRisksContent={plan.scriptRisksContent}
+          hasDeclaredScriptRisks={!!plan.manifest?.scriptRisks}
           onAccept={() => {
             const ts = new Date().toISOString();
             setAcceptedRisks((prev) => {
