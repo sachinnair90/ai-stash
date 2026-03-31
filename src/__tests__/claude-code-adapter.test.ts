@@ -28,44 +28,44 @@ describe('getInstallPaths', () => {
     const asset = makeAsset({ type: 'skill', files: ['main.md', 'util.md'] });
     const paths = claudeCodeAdapter.getInstallPaths(asset, 'project', projectRoot);
     expect(paths).toEqual([
-      '/project/.claude/skills/test-asset/main.md',
-      '/project/.claude/skills/test-asset/util.md',
+      path.join(projectRoot, '.claude', 'skills', 'test-asset', 'main.md'),
+      path.join(projectRoot, '.claude', 'skills', 'test-asset', 'util.md'),
     ]);
   });
 
   it('returns correct paths for skill - global scope', () => {
     const asset = makeAsset({ type: 'skill', files: ['main.md'] });
     const paths = claudeCodeAdapter.getInstallPaths(asset, 'global', projectRoot);
-    expect(paths[0]).toContain('.claude/skills/test-asset/main.md');
+    expect(paths[0]).toContain(path.join('.claude', 'skills', 'test-asset', 'main.md'));
     // Global paths use os.homedir()
-    expect(paths[0]).not.toContain('/project');
+    expect(paths[0]).not.toContain(projectRoot);
   });
 
   it('returns correct paths for agent', () => {
     const asset = makeAsset({ type: 'agent', name: 'my-agent' });
     const paths = claudeCodeAdapter.getInstallPaths(asset, 'project', projectRoot);
-    expect(paths).toEqual(['/project/.claude/agents/my-agent.md']);
+    expect(paths).toEqual([path.join(projectRoot, '.claude', 'agents', 'my-agent.md')]);
   });
 
   it('returns correct paths for instruction', () => {
     const asset = makeAsset({ type: 'instruction' });
     const paths = claudeCodeAdapter.getInstallPaths(asset, 'project', projectRoot);
-    expect(paths).toEqual(['/project/CLAUDE.md']);
+    expect(paths).toEqual([path.join(projectRoot, 'CLAUDE.md')]);
   });
 
   it('returns correct paths for hook', () => {
     const asset = makeAsset({ type: 'hook', name: 'my-hook', files: ['hooks/my-hook/hook-config.json', 'hooks/my-hook/check.sh'] });
     const paths = claudeCodeAdapter.getInstallPaths(asset, 'project', projectRoot);
     expect(paths).toEqual([
-      '/project/.claude/settings.json',
-      '/project/.claude/hooks/my-hook/check.sh',
+      path.join(projectRoot, '.claude', 'settings.json'),
+      path.join(projectRoot, '.claude', 'hooks', 'my-hook', 'check.sh'),
     ]);
   });
 
   it('returns correct paths for command', () => {
     const asset = makeAsset({ type: 'command', name: 'my-command' });
     const paths = claudeCodeAdapter.getInstallPaths(asset, 'project', projectRoot);
-    expect(paths).toEqual(['/project/.claude/skills/my-command/SKILL.md']);
+    expect(paths).toEqual([path.join(projectRoot, '.claude', 'skills', 'my-command', 'SKILL.md')]);
   });
 
   it('returns correct paths for plugin', () => {
@@ -76,15 +76,15 @@ describe('getInstallPaths', () => {
     });
     const paths = claudeCodeAdapter.getInstallPaths(asset, 'project', projectRoot);
     expect(paths).toEqual([
-      '/project/.claude/plugins/dev-workflow/.claude-plugin/plugin.json',
-      '/project/.claude/plugins/dev-workflow/skills/commit/SKILL.md',
+      path.join(projectRoot, '.claude', 'plugins', 'dev-workflow', '.claude-plugin', 'plugin.json'),
+      path.join(projectRoot, '.claude', 'plugins', 'dev-workflow', 'skills', 'commit', 'SKILL.md'),
     ]);
   });
 
   it('returns .mcp.json path for mcp-server (project scope)', () => {
     const asset = makeAsset({ type: 'mcp-server', name: 'github', files: ['mcp-servers/github/mcp.json'] });
     const paths = claudeCodeAdapter.getInstallPaths(asset, 'project', projectRoot);
-    expect(paths).toEqual(['/project/.mcp.json']);
+    expect(paths).toEqual([path.join(projectRoot, '.mcp.json')]);
   });
 });
 

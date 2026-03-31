@@ -16,6 +16,11 @@ import type {
   InstallResult,
 } from './types.js';
 
+/** Normalise a relative path to POSIX forward slashes (lockfile portability). */
+function toPosix(p: string): string {
+  return p.split(path.sep).join('/');
+}
+
 // TUI-compatible types (re-exported for backward compatibility)
 export interface InstallOptions {
   scope: 'project' | 'global';
@@ -189,9 +194,9 @@ export async function planInstall(
     : undefined;
 
   for (const filePath of Object.keys(transformedFiles)) {
-    const relativePath = path.relative(projectRoot, filePath);
+    const relativePath = toPosix(path.relative(projectRoot, filePath));
     if (fs.existsSync(filePath)) {
-      const isManaged = installedEntry?.files.includes(relativePath) ?? false;
+      const isManaged = installedEntry?.files.some(f => toPosix(f) === relativePath) ?? false;
       conflicts.push({ filePath: relativePath, isManaged });
     }
   }
@@ -251,7 +256,7 @@ export async function executeInstall(
   }
 
   for (const [absolutePath, content] of Object.entries(plan.files)) {
-    const relativePath = path.relative(projectRoot, absolutePath);
+    const relativePath = toPosix(path.relative(projectRoot, absolutePath));
 
     // Skip configuredFiles during update to preserve user config (task 7.2)
     if (options?.skipConfiguredFiles && configuredFilesSet.has(path.basename(relativePath))) {
@@ -574,7 +579,7 @@ export async function installAsset(
 
     // Notify progress for each file
     for (const filePath of Object.keys(plan.files)) {
-      const relativePath = path.relative(projectRoot, filePath);
+      const relativePath = toPosix(path.relative(projectRoot, filePath));
       const conflict = plan.conflicts.find((c) => c.filePath === relativePath);
 
       if (conflict && !conflict.isManaged) {
