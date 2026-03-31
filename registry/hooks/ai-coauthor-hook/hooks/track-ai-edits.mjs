@@ -44,16 +44,28 @@ try {
 // ── For Copilot postToolUse: skip non-file-write tools ───────────────────────
 if (payload.toolName !== undefined) {
   const tool = String(payload.toolName).toLowerCase();
-  const fileWriteTools = ['edit', 'create', 'write', 'str_replace', 'str_replace_based_edit', 'create_file'];
+  const fileWriteTools = [
+    // This Copilot agent's actual tool names
+    'replace_string_in_file', 'multi_replace_string_in_file', 'create_file',
+    // Claude Code / other agents
+    'edit', 'create', 'write', 'str_replace', 'str_replace_based_edit',
+  ];
   if (!fileWriteTools.includes(tool)) process.exit(0);
 }
 
 // ── Extract file path(s) from either Claude Code or Copilot payload ──────────
 function extractFilePaths(p) {
-  // Copilot format: toolArgs is a JSON string with 'path' or 'file_path'
+  // Copilot format: toolArgs is a JSON string (or object) with path info
   if (p.toolArgs !== undefined) {
     try {
-      const args = JSON.parse(p.toolArgs);
+      const args = typeof p.toolArgs === 'string' ? JSON.parse(p.toolArgs) : p.toolArgs;
+      // multi_replace_string_in_file: { replacements: [{ filePath, ... }] }
+      if (Array.isArray(args.replacements)) {
+        return args.replacements
+          .map(r => r?.filePath ?? r?.file_path ?? r?.path)
+          .filter(Boolean)
+          .map(fp => p.cwd ? resolve(p.cwd, fp) : resolve(fp));
+      }
       const rawPath = args.path ?? args.file_path ?? args.filePath ?? null;
       if (!rawPath) return [];
       const base = p.cwd ? resolve(p.cwd, rawPath) : resolve(rawPath);
@@ -120,7 +132,8 @@ const sessionMap = new Map(
 const logLines = [];
 
 for (const absPath of filePaths) {
-  const relPath = relative(gitRoot, absPath);
+  // Normalize to forward slashes — git always uses '/' regardless of OS
+  const relPath = relative(gitRoot, absPath).replace(/\\/g, '/');
 
   let contentHash;
   try {

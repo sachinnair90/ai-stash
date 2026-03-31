@@ -172,10 +172,25 @@ git add .
 git commit -m "feat: ..."
 ```
 
+When `AI_ASSISTANT=copilot` is set **without** `track-ai-edits` running, the hook
+adds a `Co-authored-by` trailer but cannot add `AI-modified:` lines (since file-level
+tracking data is not available). If `track-ai-edits` is also active — for example via
+Claude Code hooks or Copilot agent hooks — per-file `AI-modified:` trailers will be
+included as normal.
+
 To cancel before committing:
 
 ```bash
 unset AI_ASSISTANT
+```
+
+### Generic fallback identity
+
+When an AI tool records edits via `track-ai-edits.mjs` but no `.ai_session_meta`
+is written (e.g. a third-party integration), the hook uses a generic identity:
+
+```text
+Co-authored-by: AI Assistant <ai-assistant@users.noreply.github.com>
 ```
 
 ---

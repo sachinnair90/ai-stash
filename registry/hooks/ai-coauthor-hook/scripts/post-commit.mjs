@@ -33,6 +33,9 @@ const metaFile    = resolve(gitDir, '.ai_session_meta');
 const pendingFlag = resolve(gitDir, '.ai_commit_pending');
 
 if (existsSync(pendingFlag)) {
+  // Clean up ALL session state so the next non-AI commit is not falsely attributed.
+  // If the AI assistant is still active, track-ai-edits will re-create the meta
+  // and session files on the next edit — so no attribution is lost.
   for (const f of [sessionFile, metaFile, pendingFlag]) {
     try { if (existsSync(f)) rmSync(f); } catch { /* ignore */ }
   }
