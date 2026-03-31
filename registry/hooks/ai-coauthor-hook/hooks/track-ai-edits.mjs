@@ -42,8 +42,10 @@ try {
 }
 
 // ── For Copilot postToolUse: skip non-file-write tools ───────────────────────
-if (payload.toolName !== undefined) {
-  const tool = String(payload.toolName).toLowerCase();
+// VS Code sends tool_name (snake_case); Copilot CLI sent toolName (camelCase)
+const _toolName = payload.tool_name ?? payload.toolName;
+if (_toolName !== undefined) {
+  const tool = String(_toolName).toLowerCase();
   const fileWriteTools = [
     // This Copilot agent's actual tool names
     'replace_string_in_file', 'multi_replace_string_in_file', 'create_file',
@@ -55,10 +57,13 @@ if (payload.toolName !== undefined) {
 
 // ── Extract file path(s) from either Claude Code or Copilot payload ──────────
 function extractFilePaths(p) {
-  // Copilot format: toolArgs is a JSON string (or object) with path info
-  if (p.toolArgs !== undefined) {
+  // VS Code sends tool_input (camelCase props); Copilot CLI sent toolArgs; Claude Code sent tool_input (snake_case)
+  // Unify: prefer toolArgs if present (Copilot CLI), otherwise fall back to tool_input (VS Code / Claude Code)
+  const rawArgs = p.toolArgs !== undefined ? p.toolArgs : p.tool_input;
+
+  if (rawArgs !== undefined) {
     try {
-      const args = typeof p.toolArgs === 'string' ? JSON.parse(p.toolArgs) : p.toolArgs;
+      const args = typeof rawArgs === 'string' ? JSON.parse(rawArgs) : rawArgs;
       // multi_replace_string_in_file: { replacements: [{ filePath, ... }] }
       if (Array.isArray(args.replacements)) {
         return args.replacements
@@ -66,23 +71,20 @@ function extractFilePaths(p) {
           .filter(Boolean)
           .map(fp => p.cwd ? resolve(p.cwd, fp) : resolve(fp));
       }
-      const rawPath = args.path ?? args.file_path ?? args.filePath ?? null;
+      // Claude Code MultiEdit: { edits: [{ file_path, ... }] }
+      if (Array.isArray(args.edits)) {
+        return args.edits
+          .map(e => e?.file_path ?? e?.filePath)
+          .filter(Boolean)
+          .map(fp => resolve(fp));
+      }
+      // Single file: VS Code uses camelCase (filePath), Claude Code uses snake_case (file_path)
+      const rawPath = args.filePath ?? args.file_path ?? args.path ?? null;
       if (!rawPath) return [];
       const base = p.cwd ? resolve(p.cwd, rawPath) : resolve(rawPath);
       return [base];
     } catch {
       return [];
-    }
-  }
-  // Claude Code format: tool_input.file_path (Edit/Write) or tool_input.edits[] (MultiEdit)
-  if (p.tool_input) {
-    const ti = p.tool_input;
-    if (ti.file_path) return [resolve(ti.file_path)];
-    if (Array.isArray(ti.edits)) {
-      return ti.edits
-        .map(e => e?.file_path)
-        .filter(Boolean)
-        .map(fp => resolve(fp));
     }
   }
   return [];
