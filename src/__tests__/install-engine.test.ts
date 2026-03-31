@@ -133,7 +133,7 @@ describe('planInstall', () => {
     expect(plan.conflicts).toHaveLength(0);
 
     const filePath = Object.keys(plan.files)[0];
-    expect(filePath).toContain('.claude/skills/test-skill');
+    expect(filePath).toContain(path.join('.claude', 'skills', 'test-skill'));
   });
 
   it('detects managed conflict (file in lockfile.installed key.files)', async () => {

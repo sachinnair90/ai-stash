@@ -27,27 +27,27 @@ describe('getInstallPaths', () => {
     const asset = makeAsset({ type: 'skill', files: ['skills/test-asset/main.md', 'skills/test-asset/util.md'] });
     const paths = copilotAdapter.getInstallPaths(asset, 'project', projectRoot);
     expect(paths).toEqual([
-      '/project/.github/skills/test-asset/main.md',
-      '/project/.github/skills/test-asset/util.md',
+      path.join(projectRoot, '.github', 'skills', 'test-asset', 'main.md'),
+      path.join(projectRoot, '.github', 'skills', 'test-asset', 'util.md'),
     ]);
   });
 
   it('returns correct .github paths for agent', () => {
     const asset = makeAsset({ type: 'agent', name: 'my-agent' });
     const paths = copilotAdapter.getInstallPaths(asset, 'project', projectRoot);
-    expect(paths).toEqual(['/project/.github/agents/my-agent.md']);
+    expect(paths).toEqual([path.join(projectRoot, '.github', 'agents', 'my-agent.md')]);
   });
 
   it('returns correct paths for instruction', () => {
     const asset = makeAsset({ type: 'instruction' });
     const paths = copilotAdapter.getInstallPaths(asset, 'project', projectRoot);
-    expect(paths).toEqual(['/project/AGENTS.md']);
+    expect(paths).toEqual([path.join(projectRoot, 'AGENTS.md')]);
   });
 
   it('returns correct paths for hook (old-style)', () => {
     const asset = makeAsset({ type: 'hook' });
     const paths = copilotAdapter.getInstallPaths(asset, 'project', projectRoot);
-    expect(paths).toEqual(['/project/.github/hooks/hooks.json']);
+    expect(paths).toEqual([path.join(projectRoot, '.github', 'hooks', 'hooks.json')]);
   });
 
   it('returns multi-file paths for hook with copilot-hooks.json (new-style)', () => {
@@ -65,19 +65,19 @@ describe('getInstallPaths', () => {
     });
     const paths = copilotAdapter.getInstallPaths(asset, 'project', projectRoot);
     expect(paths).toEqual([
-      '/project/.github/hooks/hooks.json',
-      '/project/.github/hooks/track-ai-edits.mjs',
-      '/project/.github/hooks/session-stop.mjs',
-      '/project/.github/hooks/session-start.mjs',
-      '/project/.github/hooks/git/prepare-commit-msg.mjs',
-      '/project/.github/hooks/git/post-commit.mjs',
+      path.join(projectRoot, '.github', 'hooks', 'hooks.json'),
+      path.join(projectRoot, '.github', 'hooks', 'track-ai-edits.mjs'),
+      path.join(projectRoot, '.github', 'hooks', 'session-stop.mjs'),
+      path.join(projectRoot, '.github', 'hooks', 'session-start.mjs'),
+      path.join(projectRoot, '.github', 'hooks', 'git', 'prepare-commit-msg.mjs'),
+      path.join(projectRoot, '.github', 'hooks', 'git', 'post-commit.mjs'),
     ]);
   });
 
   it('returns correct paths for command', () => {
     const asset = makeAsset({ type: 'command', name: 'my-command' });
     const paths = copilotAdapter.getInstallPaths(asset, 'project', projectRoot);
-    expect(paths).toEqual(['/project/.github/prompts/my-command.prompt.md']);
+    expect(paths).toEqual([path.join(projectRoot, '.github', 'prompts', 'my-command.prompt.md')]);
   });
 
   it('returns correct paths for plugin', () => {
@@ -88,15 +88,15 @@ describe('getInstallPaths', () => {
     });
     const paths = copilotAdapter.getInstallPaths(asset, 'project', projectRoot);
     expect(paths).toEqual([
-      '/project/.github/plugins/dev-workflow/.claude-plugin/plugin.json',
-      '/project/.github/plugins/dev-workflow/agents/planner.md',
+      path.join(projectRoot, '.github', 'plugins', 'dev-workflow', '.claude-plugin', 'plugin.json'),
+      path.join(projectRoot, '.github', 'plugins', 'dev-workflow', 'agents', 'planner.md'),
     ]);
   });
 
   it('returns .vscode/mcp.json path for mcp-server', () => {
     const asset = makeAsset({ type: 'mcp-server', name: 'github', files: ['mcp-servers/github/mcp.json'] });
     const paths = copilotAdapter.getInstallPaths(asset, 'project', projectRoot);
-    expect(paths).toEqual(['/project/.vscode/mcp.json']);
+    expect(paths).toEqual([path.join(projectRoot, '.vscode', 'mcp.json')]);
   });
 });
 
