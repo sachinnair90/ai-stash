@@ -7,7 +7,8 @@
  * Supported assistants:
  *   Claude Code      — tracked via .git/.ai_session_files (written by track-ai-edits.mjs)
  *   GitHub Copilot   — detected via GITHUB_COPILOT_AGENT / COPILOT_AGENT_ID / GITHUB_ACTOR
- *                      env vars, or AI_ASSISTANT=copilot, or .git/.ai_session_meta
+ *                      env vars, or AI_ASSISTANT=copilot, or .git/.ai_session_files
+ *   Any AI tool      — tracked via .git/.ai_session_files with optional .ai_session_meta
  *
  * Trailers appended to the commit message:
  *   Co-authored-by: GitHub Copilot <github-copilot[bot]@users.noreply.github.com>
@@ -121,8 +122,10 @@ const stagedFiles = getStagedFiles();
 if (!stagedFiles.length) process.exit(0);
 
 // ── Determine which AI assistant is active ────────────────────────────────────
-// mode: 'session_file' — compare hashes per-file (Claude Code)
-//       'blanket'      — tag all staged files (Copilot agent / manual flag)
+// mode: 'session_file' — compare hashes per-file (preferred for all assistants)
+//       'author_only'  — add Co-authored-by but no AI-modified: lines
+//                        (used when metaFile exists but sessionFile was not written)
+//       'blanket'      — tag all staged files (only for cloud Copilot agent with no session file)
 let displayName = '';
 let email       = '';
 let mode        = 'session_file';
@@ -132,24 +135,33 @@ if (
   process.env.COPILOT_AGENT_ID ||
   process.env.GITHUB_ACTOR === 'github-copilot[bot]'
 ) {
+  // Copilot cloud agent: blanket is acceptable since the agent runs in isolation
   displayName = 'GitHub Copilot';
   email       = 'github-copilot[bot]@users.noreply.github.com';
-  mode        = 'blanket';
+  mode = existsSync(sessionFile) ? 'session_file' : 'blanket';
 } else if (process.env.AI_ASSISTANT === 'copilot') {
+  // Local Copilot: user explicitly declared AI assistance for this shell session.
+  // With session file → per-file tracking; without → Co-authored-by only.
   displayName = 'GitHub Copilot';
   email       = 'github-copilot[bot]@users.noreply.github.com';
-  mode        = 'blanket';
-} else if (existsSync(metaFile)) {
-  const meta          = readFileSync(metaFile, 'utf8');
-  const nameMatch     = meta.match(/^DISPLAY_NAME=(.+)$/m);
-  const emailMatch    = meta.match(/^EMAIL=(.+)$/m);
-  const assistantMatch = meta.match(/^ASSISTANT=(.+)$/m);
-  displayName          = nameMatch?.[1]?.trim()     ?? '';
-  email                = emailMatch?.[1]?.trim()    ?? '';
-  const assistantType  = assistantMatch?.[1]?.trim() ?? '';
-  if (!displayName || !email) process.exit(0);
-  if (assistantType === 'copilot') mode = 'blanket';
+  mode = existsSync(sessionFile) ? 'session_file' : 'author_only';
+} else if (existsSync(sessionFile)) {
+  // An AI tool (Claude Code, Copilot with track-ai-edits, etc.) recorded edits.
+  // Read identity from meta file; fall back to generic if meta is missing.
+  if (existsSync(metaFile)) {
+    const meta       = readFileSync(metaFile, 'utf8');
+    const nameMatch  = meta.match(/^DISPLAY_NAME=(.+)$/m);
+    const emailMatch = meta.match(/^EMAIL=(.+)$/m);
+    displayName      = nameMatch?.[1]?.trim()  ?? '';
+    email            = emailMatch?.[1]?.trim() ?? '';
+  }
+  if (!displayName || !email) {
+    displayName = 'AI Assistant';
+    email       = 'ai-assistant@users.noreply.github.com';
+  }
+  mode = 'session_file';
 } else {
+  // No env vars, no session file → no evidence of AI involvement.
   process.exit(0);
 }
 
@@ -164,6 +176,8 @@ let aiConfirmed = [];
 
 if (mode === 'blanket') {
   aiConfirmed = stagedFiles;
+} else if (mode === 'author_only') {
+  // Co-authored-by will be appended below; no AI-modified: lines needed
 } else if (existsSync(sessionFile)) {
   const entries = readFileSync(sessionFile, 'utf8').trim().split('\n').filter(Boolean);
 
@@ -214,7 +228,8 @@ if (mode === 'blanket') {
   }
 }
 
-if (!aiConfirmed.length) process.exit(0);
+// In 'author_only' mode aiConfirmed is intentionally empty — we still want the Co-authored-by trailer.
+if (!aiConfirmed.length && mode !== 'author_only') process.exit(0);
 
 // ── Append attribution trailers ───────────────────────────────────────────────
 // AI-modified: uses real git trailers (not comments) so they persist in the

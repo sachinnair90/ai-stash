@@ -53,11 +53,14 @@ for (const hook of ['prepare-commit-msg', 'post-commit']) {
 
   if (!existsSync(src)) continue;
 
-  // Back up any existing hook that is not ours
+  // Reinstall whenever source has changed; back up non-AI hooks only once
   if (existsSync(dest)) {
-    const existing = readFileSync(dest, 'utf8');
-    if (existing.includes('ai_session_files')) continue; // already installed
-    copyFileSync(dest, `${dest}.pre-ai`);
+    const existing   = readFileSync(dest, 'utf8');
+    const srcContent = readFileSync(src,  'utf8');
+    if (existing === srcContent) continue; // already up to date
+    if (!existing.includes('ai_session_files')) {
+      copyFileSync(dest, `${dest}.pre-ai`); // backup non-AI hook
+    }
   }
 
   copyFileSync(src, dest);
