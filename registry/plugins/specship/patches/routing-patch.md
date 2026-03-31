@@ -1,7 +1,8 @@
-# specship:speccer
-# This block was inserted by the specship plugin post-install script.
-# To remove: run the specship postUninstall script, or delete everything
-# between the specship:speccer and /specship:speccer sentinels.
+<!-- specship:speccer
+     Inserted by the specship plugin post-install script.
+     To remove: run the specship postUninstall script, or delete everything
+     between the specship:speccer and /specship:speccer sentinels.
+-->
 
 ## ⛔ Spec Gate — Check This First
 
@@ -34,4 +35,4 @@ This check runs before anything else. Eager execution does not apply here — a 
 | Spec status check | Speccer | "is X specced?", "do we have a spec for X?" |
 | Explicit explore | Speccer | "explore X" before any spec exists |
 
-# /specship:speccer
+<!-- /specship:speccer -->

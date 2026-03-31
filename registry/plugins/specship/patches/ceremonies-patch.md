@@ -1,7 +1,8 @@
-# specship:spec-gate
-# This block was inserted by the specship plugin post-install script.
-# To remove: run the specship postUninstall script, or delete everything
-# between the specship:spec-gate and /specship:spec-gate sentinels.
+<!-- specship:spec-gate
+     Inserted by the specship plugin post-install script.
+     To remove: run the specship postUninstall script, or delete everything
+     between the specship:spec-gate and /specship:spec-gate sentinels.
+-->
 
 ## Spec Gate
 
@@ -29,4 +30,4 @@
 
 ---
 
-# /specship:spec-gate
+<!-- /specship:spec-gate -->

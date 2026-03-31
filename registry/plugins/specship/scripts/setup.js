@@ -35,8 +35,8 @@ const SETUP_COMPLETE = path.join(PLUGIN_DIR, '.setup-complete');
 const CEREMONIES_PATCH = path.join(PLUGIN_DIR, 'patches', 'ceremonies-patch.md');
 const ROUTING_PATCH = path.join(PLUGIN_DIR, 'patches', 'routing-patch.md');
 
-const CEREMONY_SENTINEL = '# specship:spec-gate';
-const ROUTING_SENTINEL = '# specship:speccer';
+const CEREMONY_SENTINEL = '<!-- specship:spec-gate';
+const ROUTING_SENTINEL = '<!-- specship:speccer';
 
 // ── Agent / skill source → dest pairs ────────────────────────────────────────
 const SPECCER_SRC  = path.join(PLUGIN_DIR, '.squad', 'agents', 'speccer');

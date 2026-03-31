@@ -27,10 +27,10 @@ const SPECCER_DIR = path.join(SQUAD_DIR, 'agents', 'speccer');
 const ALUMNI_DIR = path.join(SQUAD_DIR, 'agents', '_alumni', 'speccer');
 const SETUP_COMPLETE = path.join(PLUGIN_DIR, '.setup-complete');
 
-const CEREMONY_START = '# specship:spec-gate';
-const CEREMONY_END   = '# /specship:spec-gate';
-const ROUTING_START  = '# specship:speccer';
-const ROUTING_END    = '# /specship:speccer';
+const CEREMONY_START = '<!-- specship:spec-gate';
+const CEREMONY_END   = '<!-- /specship:spec-gate -->';
+const ROUTING_START  = '<!-- specship:speccer';
+const ROUTING_END    = '<!-- /specship:speccer -->';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function ok(msg)  { console.log(`  ✅ ${msg}`); }
