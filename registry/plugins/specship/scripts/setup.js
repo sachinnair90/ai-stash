@@ -24,7 +24,18 @@ const OPENSPEC_VERSION_RANGE = '1.2';  // matches 1.2.x
 
 // ── Paths ────────────────────────────────────────────────────────────────────
 const PLUGIN_DIR = path.resolve(__dirname, '..');
-const PROJECT_ROOT = process.cwd();
+const gitRoot = (() => {
+  try {
+    return execSync('git rev-parse --show-toplevel', { encoding: 'utf-8' }).trim();
+  } catch {
+    return null;
+  }
+})();
+if (!gitRoot) {
+  console.error('  ❌ Not inside a git repository. Please cd to your project root and re-run.');
+  process.exit(1);
+}
+const PROJECT_ROOT = gitRoot;
 const SQUAD_DIR = path.join(PROJECT_ROOT, '.squad');
 const OPENSPEC_DIR = path.join(PROJECT_ROOT, 'openspec');
 const CEREMONIES_FILE = path.join(SQUAD_DIR, 'ceremonies.md');
@@ -183,7 +194,7 @@ function applyCeremonyPatch() {
   // Insert before the first ## heading so spec-gate is first
   const firstHeading = existing.match(/^## /m);
   if (firstHeading) {
-    const idx = existing.indexOf(firstHeading[0]);
+    const idx = firstHeading.index;
     existing = existing.slice(0, idx) + patch + '\n' + existing.slice(idx);
   } else {
     existing = existing.trimEnd() + '\n\n' + patch + '\n';
@@ -215,13 +226,13 @@ function applyRoutingPatch() {
   // Insert before ## Routing Table (or ## Routing) so preamble is read first
   const tableHeading = existing.match(/^## Routing(?: Table)?\b/m);
   if (tableHeading) {
-    const idx = existing.indexOf(tableHeading[0]);
+    const idx = tableHeading.index;
     existing = existing.slice(0, idx) + patch + '\n' + existing.slice(idx);
   } else {
     // Fallback: insert before first ## heading
     const firstHeading = existing.match(/^## /m);
     if (firstHeading) {
-      const idx = existing.indexOf(firstHeading[0]);
+      const idx = firstHeading.index;
       existing = existing.slice(0, idx) + patch + '\n' + existing.slice(idx);
     } else {
       existing = existing.trimEnd() + '\n\n' + patch + '\n';

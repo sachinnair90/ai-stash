@@ -10,9 +10,9 @@ The specship plugin SHALL be registered in `registry/registry.json` under the `p
 ### Requirement: Plugin installs via standard ai-stash plugin machinery
 The plugin SHALL use the folder-based plugin format with a `manifest.json` declaring all installed files, `scripts.postInstall`, and `scriptRisks`.
 
-#### Scenario: Plugin installs without engine changes
+#### Scenario: Plugin installs via plugin folder
 - **WHEN** a user runs `ai-stash add plugin specship`
-- **THEN** all files listed in `manifest.json` are installed to the correct target paths without any changes to `src/`
+- **THEN** all files listed in `manifest.json` are installed to the correct target paths
 
 #### Scenario: Risk disclaimer shown before install
 - **WHEN** a user attempts to install specship

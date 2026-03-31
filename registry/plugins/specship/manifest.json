@@ -1,6 +1,6 @@
 {
   "files": [
-    ".claude-plugin/plugin.json",
+    "plugin.json",
     ".squad/agents/speccer/charter.md",
     ".squad/agents/speccer/history.md",
     ".squad/skills/openspec/SKILL.md",

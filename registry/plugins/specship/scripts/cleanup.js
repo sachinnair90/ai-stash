@@ -15,10 +15,22 @@
 
 const fs = require('fs');
 const path = require('path');
+const { execSync } = require('child_process');
 
 // ── Paths ────────────────────────────────────────────────────────────────────
 const PLUGIN_DIR = path.resolve(__dirname, '..');
-const PROJECT_ROOT = process.cwd();
+const gitRoot = (() => {
+  try {
+    return execSync('git rev-parse --show-toplevel', { encoding: 'utf-8' }).trim();
+  } catch {
+    return null;
+  }
+})();
+if (!gitRoot) {
+  console.error('  ❌ Not inside a git repository. Please cd to your project root and re-run.');
+  process.exit(1);
+}
+const PROJECT_ROOT = gitRoot;
 const SQUAD_DIR = path.join(PROJECT_ROOT, '.squad');
 const CEREMONIES_FILE = path.join(SQUAD_DIR, 'ceremonies.md');
 const ROUTING_FILE = path.join(SQUAD_DIR, 'routing.md');

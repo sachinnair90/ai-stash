@@ -8,8 +8,8 @@
 2. **Checks OpenSpec CLI version** — runs `openspec --version` and compares against the pinned version (`1.2.x`). If missing or mismatched, installs the pinned version globally via `npm install -g`.
 3. **Inits `.squad/`** — if `.squad/` does not exist in the current directory, runs `squad init` to scaffold the Squad directory structure.
 4. **Inits `openspec/`** — if `openspec/` does not exist, runs `openspec init` to scaffold the OpenSpec directory structure.
-5. **Applies ceremony patch** — appends the spec-gate ceremony definition to `.squad/ceremonies.md`. Checks for the sentinel `# specship:spec-gate` first; skips if already present.
-6. **Applies routing patch** — appends the Speccer routing entry to `.squad/routing.md`. Checks for the sentinel `# specship:speccer` first; skips if already present.
+5. **Applies ceremony patch** — appends the spec-gate ceremony definition to `.squad/ceremonies.md`. Checks for the sentinel `<!-- specship:spec-gate` first; skips if already present.
+6. **Applies routing patch** — appends the Speccer routing entry to `.squad/routing.md`. Checks for the sentinel `<!-- specship:speccer` first; skips if already present.
 7. **Writes `.setup-complete`** — creates this file in the plugin directory on success so ai-stash can track setup status.
 
 ### Side effects
@@ -47,6 +47,6 @@
 
 Remove the blocks between these sentinel comments manually:
 
-In `.squad/ceremonies.md`: remove everything between `# specship:spec-gate` and `# /specship:spec-gate`
+In `.squad/ceremonies.md`: remove everything between `<!-- specship:spec-gate` and `<!-- /specship:spec-gate -->`
 
-In `.squad/routing.md`: remove everything between `# specship:speccer` and `# /specship:speccer`
+In `.squad/routing.md`: remove everything between `<!-- specship:speccer` and `<!-- /specship:speccer -->`

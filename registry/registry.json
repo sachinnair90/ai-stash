@@ -148,7 +148,8 @@
       "description": "Spec-driven Squad plugin. Absorbs OpenSpec's workflow into Squad as a native ceremony — a Speccer agent assesses ideas, produces spec artifacts, gates on human approval, then the Coordinator routes tasks.md to the right squad members.",
       "tags": ["workflow", "spec-driven", "squad", "openspec", "planning"],
       "targets": ["claude-code"],
-      "folder": "plugins/specship"
+      "folder": "plugins/specship",
+      "hasScripts": true
     }
   ]
 }

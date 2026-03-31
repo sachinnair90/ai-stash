@@ -292,9 +292,18 @@ function mergeHooks(existingJson: string, incomingJson: string): string {
 
   // New-style: hooks is an object keyed by event name (copilot-hooks.json format)
   if (incoming.hooks !== undefined && !Array.isArray(incoming.hooks)) {
-    const existingHooks = (existing.hooks && !Array.isArray(existing.hooks))
-      ? (existing.hooks as Record<string, Array<Record<string, unknown>>>)
-      : {};
+    // If existing hooks are the old array format, migrate them into the new object-keyed
+    // structure before merging so we don't silently drop previously configured hooks.
+    let existingHooks: Record<string, Array<Record<string, unknown>>>;
+    if (existing.hooks && Array.isArray(existing.hooks)) {
+      existingHooks = {};
+      for (const hook of existing.hooks as Array<Record<string, unknown>>) {
+        const event = (hook.event as string) ?? 'unknown';
+        (existingHooks[event] ??= []).push(hook);
+      }
+    } else {
+      existingHooks = (existing.hooks as Record<string, Array<Record<string, unknown>>>) ?? {};
+    }
     const incomingHooks = incoming.hooks as Record<string, Array<Record<string, unknown>>>;
     const merged: Record<string, Array<Record<string, unknown>>> = { ...existingHooks };
     for (const [event, entries] of Object.entries(incomingHooks)) {

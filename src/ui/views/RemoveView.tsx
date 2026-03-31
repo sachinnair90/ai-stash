@@ -92,7 +92,7 @@ export function RemoveView({ assetName, lockfile, projectRoot, onDone, onCancel 
       <Text bold color="red">Remove {assetName}?</Text>
       <Box marginTop={1} flexDirection="column">
         <Text>The following files will be deleted:</Text>
-        {asset.files.map((f) => (
+        {(asset.files ?? []).map((f) => (
           <Text key={f} dimColor>  {f}</Text>
         ))}
       </Box>

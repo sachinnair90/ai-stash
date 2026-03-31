@@ -15,7 +15,7 @@ The integration gap: Squad agents implement features without accessing OpenSpec 
 - Install a `spec-gate` ceremony that fires before feature implementation, running explore-or-propose and gating on human approval
 - Install Squad skills that inject OpenSpec context into implementors and teach Scribe to absorb spec decisions on archive
 - Provide a version-pinned post-install script that ensures known-good Squad + OpenSpec versions and idempotently applies routing/ceremony patches
-- Ship as a standard ai-stash folder-based plugin with no changes to `src/`
+- Ship primarily as a standard ai-stash folder-based plugin, with minimal, well-scoped `src/` changes required for integration
 
 **Non-Goals:**
 - Modifying `squad.agent.md` — all Squad integration goes through `.squad/` extension files only

@@ -6,7 +6,5 @@
     "name": "ai-stash"
   },
   "repository": "https://github.com/ai-stash/registry",
-  "keywords": ["workflow", "spec-driven", "squad", "openspec", "planning"],
-  "agents": "",
-  "skills": ""
+  "keywords": ["workflow", "spec-driven", "squad", "openspec", "planning"]
 }

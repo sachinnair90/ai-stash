@@ -30,6 +30,6 @@ OpenSpec and Squad are powerful independently but have no native integration —
 
 - New directory: `registry/plugins/specship/` in the ai-stash registry
 - New registry entry in `registry/registry.json` under `plugins`
-- No changes to `src/` — uses existing plugin install machinery (`manifest.json`, `scripts.postInstall`, `SCRIPT_RISKS.md`)
+- Changes to `src/`: engine and adapter updates required to support the new plugin/hook formats (registry schema, install planning, copilot adapter hook merging)
 - No changes to `squad.agent.md` — all integration through Squad's native extension points (skills, ceremonies, routing)
 - Depends on: ai-stash plugin engine (folder-based plugin with manifest), Squad CLI `0.9.x`, OpenSpec CLI `1.2.x`

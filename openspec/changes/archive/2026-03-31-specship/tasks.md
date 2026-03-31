@@ -17,8 +17,8 @@
 
 ## 4. Ceremony and Routing Patches
 
-- [x] 4.1 Write `registry/plugins/specship/patches/ceremonies-patch.md` — the spec-gate ceremony definition block with sentinel comment `# specship:spec-gate`, trigger condition, Speccer as facilitator (sync), human gate on proposal approval, ceremony output structure (feature name, tasks.md path, specs/ path)
-- [x] 4.2 Write `registry/plugins/specship/patches/routing-patch.md` — the Speccer routing entry block with sentinel comment `# specship:speccer`, routing rules for "new feature" and "spec" request types
+- [x] 4.1 Write `registry/plugins/specship/patches/ceremonies-patch.md` — the spec-gate ceremony definition block with sentinel comment `<!-- specship:spec-gate -->`, trigger condition, Speccer as facilitator (sync), human gate on proposal approval, ceremony output structure (feature name, tasks.md path, specs/ path)
+- [x] 4.2 Write `registry/plugins/specship/patches/routing-patch.md` — the Speccer routing entry block with sentinel comment `<!-- specship:speccer -->`, routing rules for "new feature" and "spec" request types
 
 ## 5. Post-Install Script
 

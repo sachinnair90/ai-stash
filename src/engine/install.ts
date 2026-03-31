@@ -118,6 +118,9 @@ export async function planInstall(
   } else if (asset.file) {
     filesToFetch = [asset.file];
     asset = { ...asset, files: filesToFetch };
+  } else if (asset.files && asset.files.length > 0) {
+    // Legacy registry entries that only provide `files` — use them directly
+    filesToFetch = asset.files;
   } else {
     throw new Error(`Asset "${asset.name}" has neither a 'file' nor a 'folder' field`);
   }
@@ -136,9 +139,14 @@ export async function planInstall(
   }
 
   // Fetch all asset files from registry
+  // Normalise paths: if a path already includes the folder prefix (registry-root-relative),
+  // strip it so it resolves correctly against the folder-scoped fileBaseUrl.
   const rawFiles: Record<string, string> = {};
   for (const filePath of filesToFetch) {
-    rawFiles[filePath] = await fetchAssetFile(fileBaseUrl, filePath, githubToken);
+    const normalizedPath = (asset.folder && filePath.startsWith(`${asset.folder}/`))
+      ? filePath.slice(asset.folder.length + 1)
+      : filePath;
+    rawFiles[filePath] = await fetchAssetFile(fileBaseUrl, normalizedPath, githubToken);
   }
 
   // Collect userConfig if manifest declares it (task 5.1)
