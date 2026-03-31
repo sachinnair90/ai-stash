@@ -17,7 +17,7 @@ export const copilotAdapter: Adapter = {
 
     switch (assetType) {
       case 'skill':
-        return asset.files.map(f => path.join(base, 'skills', asset.name, path.basename(f)));
+        return (asset.files ?? []).map(f => path.join(base, 'skills', asset.name, path.basename(f)));
       case 'agent':
         return [path.join(base, 'agents', `${asset.name}.md`)];
       case 'instruction': {
@@ -28,12 +28,30 @@ export const copilotAdapter: Adapter = {
         }
         return [agentsMd];
       }
-      case 'hook':
-        return [path.join(base, 'hooks', 'hooks.json')];
+      case 'hook': {
+        const hooksDir = path.join(base, 'hooks');
+        // New-style: manifest declares copilot-hooks.json → install multiple files
+        if ((asset.files ?? []).some(f => path.basename(f) === 'copilot-hooks.json')) {
+          const paths: string[] = [];
+          for (const f of (asset.files ?? [])) {
+            if (f.endsWith('hook-config.json')) continue;
+            if (path.basename(f) === 'copilot-hooks.json') {
+              paths.push(path.join(hooksDir, 'hooks.json'));
+            } else if (f.startsWith('hooks/')) {
+              paths.push(path.join(hooksDir, path.basename(f)));
+            } else if (f.startsWith('scripts/')) {
+              paths.push(path.join(hooksDir, 'git', path.basename(f)));
+            }
+          }
+          return paths;
+        }
+        // Old-style: only hooks.json
+        return [path.join(hooksDir, 'hooks.json')];
+      }
       case 'command':
         return [path.join(base, 'prompts', `${asset.name}.prompt.md`)];
       case 'plugin':
-        return asset.files.map(f => {
+        return (asset.files ?? []).map(f => {
           const rel = f.replace(new RegExp(`^plugins/${asset.name}/`), '');
           return path.join(base, 'plugins', asset.name, rel);
         });
@@ -64,11 +82,19 @@ export const copilotAdapter: Adapter = {
       }
       case 'hook': {
         const result: Record<string, string> = {};
+        const hasNewStyle = Object.keys(files).some(f => path.basename(f) === 'copilot-hooks.json');
         for (const [filePath, content] of Object.entries(files)) {
-          if (filePath.endsWith('hook-config.json')) {
-            result[filePath] = transformHookConfig(content);
-          } else {
+          if (hasNewStyle) {
+            // New-style: hook-config.json is Claude Code only; pass everything else through
+            if (filePath.endsWith('hook-config.json')) continue;
             result[filePath] = content;
+          } else {
+            // Old-style: transform hook-config.json into Copilot format
+            if (filePath.endsWith('hook-config.json')) {
+              result[filePath] = transformHookConfig(content);
+            } else {
+              result[filePath] = content;
+            }
           }
         }
         return result;
@@ -264,6 +290,33 @@ function mergeHooks(existingJson: string, incomingJson: string): string {
   const existing = JSON.parse(existingJson || '{}') as Record<string, unknown>;
   const incoming = JSON.parse(incomingJson) as Record<string, unknown>;
 
+  // New-style: hooks is an object keyed by event name (copilot-hooks.json format)
+  if (incoming.hooks !== undefined && !Array.isArray(incoming.hooks)) {
+    // If existing hooks are the old array format, migrate them into the new object-keyed
+    // structure before merging so we don't silently drop previously configured hooks.
+    let existingHooks: Record<string, Array<Record<string, unknown>>>;
+    if (existing.hooks && Array.isArray(existing.hooks)) {
+      existingHooks = {};
+      for (const hook of existing.hooks as Array<Record<string, unknown>>) {
+        const event = (hook.event as string) ?? 'unknown';
+        (existingHooks[event] ??= []).push(hook);
+      }
+    } else {
+      existingHooks = (existing.hooks as Record<string, Array<Record<string, unknown>>>) ?? {};
+    }
+    const incomingHooks = incoming.hooks as Record<string, Array<Record<string, unknown>>>;
+    const merged: Record<string, Array<Record<string, unknown>>> = { ...existingHooks };
+    for (const [event, entries] of Object.entries(incomingHooks)) {
+      const prev = merged[event] ?? [];
+      for (const entry of entries) {
+        if (!prev.some(p => p.bash === entry.bash)) prev.push(entry);
+      }
+      merged[event] = prev;
+    }
+    return JSON.stringify({ ...existing, hooks: merged }, null, 2);
+  }
+
+  // Old-style: hooks is an array with name-based dedup
   const existingHooks = (existing.hooks ?? []) as Array<Record<string, unknown>>;
   const incomingHooks = (incoming.hooks ?? []) as Array<Record<string, unknown>>;
 

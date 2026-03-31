@@ -113,20 +113,40 @@ export async function planInstall(
   if (asset.folder) {
     manifest = await fetchManifest(registryBaseUrl, asset.folder, githubToken);
     filesToFetch = manifest.files;
-  } else {
+    // Populate asset.files from manifest so adapters can reference it
+    asset = { ...asset, files: filesToFetch };
+  } else if (asset.file) {
+    filesToFetch = [asset.file];
+    asset = { ...asset, files: filesToFetch };
+  } else if (asset.files && asset.files.length > 0) {
+    // Legacy registry entries that only provide `files` — use them directly
     filesToFetch = asset.files;
+  } else {
+    throw new Error(`Asset "${asset.name}" has neither a 'file' nor a 'folder' field`);
   }
 
-  // Fetch SCRIPT_RISKS.md content if declared in manifest
+  // For folder-based assets, manifest.files and scriptRisks paths are relative to the folder,
+  // not the registry root. Compute a folder-scoped base URL so relative paths resolve correctly.
+  const fileBaseUrl = asset.folder
+    ? new URL(`${asset.folder}/`, registryBaseUrl).href
+    : registryBaseUrl;
+
+  // Fetch SCRIPT_RISKS.md content if declared in manifest (path relative to folder)
   let scriptRisksContent: string | undefined;
   if (manifest?.scriptRisks) {
-    const content = await fetchScriptRisks(registryBaseUrl, manifest.scriptRisks, githubToken);
+    const content = await fetchScriptRisks(fileBaseUrl, manifest.scriptRisks, githubToken);
     scriptRisksContent = content ?? undefined;
   }
 
   // Fetch all asset files from registry
-  const rawFiles: Record<string, string> = {};  for (const filePath of filesToFetch) {
-    rawFiles[filePath] = await fetchAssetFile(registryBaseUrl, filePath, githubToken);
+  // Normalise paths: if a path already includes the folder prefix (registry-root-relative),
+  // strip it so it resolves correctly against the folder-scoped fileBaseUrl.
+  const rawFiles: Record<string, string> = {};
+  for (const filePath of filesToFetch) {
+    const normalizedPath = (asset.folder && filePath.startsWith(`${asset.folder}/`))
+      ? filePath.slice(asset.folder.length + 1)
+      : filePath;
+    rawFiles[filePath] = await fetchAssetFile(fileBaseUrl, normalizedPath, githubToken);
   }
 
   // Collect userConfig if manifest declares it (task 5.1)
@@ -324,9 +344,21 @@ export async function executeInstall(
   // Build script notice for postInstall (task 6.1-6.2)
   let scriptNotice: string | undefined;
   if (plan.manifest?.scripts?.postInstall) {
-    // Determine the installed folder path from the first installed file
-    const firstFile = installedFiles[0];
-    const assetDir = firstFile ? path.dirname(path.join(projectRoot, firstFile)) : projectRoot;
+    // Determine the asset root by finding the common directory prefix of all
+    // installed files. This handles folder-based assets (e.g. plugins) where
+    // files are nested in subdirectories and the script path is relative to
+    // the asset's top-level install folder, not to any individual file's dir.
+    let assetDir = projectRoot;
+    if (installedFiles.length > 0) {
+      const dirParts = installedFiles.map(f => path.dirname(path.join(projectRoot, f)).split(path.sep));
+      let common = dirParts[0];
+      for (const parts of dirParts.slice(1)) {
+        let i = 0;
+        while (i < common.length && i < parts.length && common[i] === parts[i]) i++;
+        common = common.slice(0, i);
+      }
+      if (common.length > 0) assetDir = common.join(path.sep);
+    }
     const scriptPath = path.join(assetDir, plan.manifest.scripts.postInstall);
     scriptNotice = buildScriptNotice(scriptPath, 'install');
   }
@@ -524,7 +556,7 @@ export async function installAsset(
     lockfile,
   );
 
-  const fileStatuses: InstallFileStatus[] = asset.files.map((f) => ({
+  const fileStatuses: InstallFileStatus[] = (asset.files ?? (asset.file ? [asset.file] : [])).map((f) => ({
     file: f,
     status: 'pending' as const,
   }));

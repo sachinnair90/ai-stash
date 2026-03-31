@@ -8,8 +8,7 @@
       "description": "Craft conventional commit messages by analyzing staged diffs — auto-detects type, scope, and generates the commit command.",
       "tags": ["git", "commits", "conventional-commits", "workflow"],
       "targets": ["claude-code"],
-      "files": ["skills/git-commit/SKILL.md"],
-      "manifestUrl": "skills/git-commit/SKILL.md"
+      "file": "skills/git-commit/SKILL.md"
     },
     {
       "name": "conventional-commit",
@@ -17,8 +16,7 @@
       "description": "Structured workflow for generating Conventional Commits-compliant messages using an XML prompt template with validation.",
       "tags": ["git", "commits", "conventional-commits", "workflow"],
       "targets": ["copilot", "claude-code"],
-      "files": ["skills/conventional-commit/SKILL.md"],
-      "manifestUrl": "skills/conventional-commit/SKILL.md"
+      "file": "skills/conventional-commit/SKILL.md"
     },
     {
       "name": "code-review",
@@ -26,8 +24,7 @@
       "description": "Tiered code review covering security, quality, and performance. Analyses staged and recent changes, applies confidence filtering, and produces a severity-graded report with an approve/warn/block verdict.",
       "tags": ["code-review", "security", "quality", "workflow"],
       "targets": ["claude-code"],
-      "files": ["skills/code-review/SKILL.md"],
-      "manifestUrl": "skills/code-review/SKILL.md"
+      "file": "skills/code-review/SKILL.md"
     },
     {
       "name": "create-adapter",
@@ -35,8 +32,7 @@
       "description": "Scaffold a new ai-stash adapter for a new AI tool target — implements the Adapter interface, registers it, and creates tests.",
       "tags": ["ai-stash", "adapter", "developer", "contributing"],
       "targets": ["claude-code"],
-      "files": ["skills/create-adapter/SKILL.md"],
-      "manifestUrl": "skills/create-adapter/SKILL.md"
+      "file": "skills/create-adapter/SKILL.md"
     },
     {
       "name": "add-asset-type",
@@ -44,8 +40,7 @@
       "description": "Add a new asset type to ai-stash — updates the type union, registry fetcher, both adapters, TUI colour map, and filter hook.",
       "tags": ["ai-stash", "asset-type", "developer", "contributing"],
       "targets": ["claude-code"],
-      "files": ["skills/add-asset-type/SKILL.md"],
-      "manifestUrl": "skills/add-asset-type/SKILL.md"
+      "file": "skills/add-asset-type/SKILL.md"
     },
     {
       "name": "add-asset",
@@ -53,8 +48,7 @@
       "description": "Add a new asset to the ai-stash registry — creates asset files in the correct directory and registers them in registry.json.",
       "tags": ["ai-stash", "registry", "developer", "contributing"],
       "targets": ["claude-code"],
-      "files": ["skills/add-asset/SKILL.md"],
-      "manifestUrl": "skills/add-asset/SKILL.md"
+      "file": "skills/add-asset/SKILL.md"
     }
   ],
   "agents": [
@@ -64,8 +58,7 @@
       "description": "Systematic four-phase debugging agent: assess → investigate → resolve → QA. Reproduces bugs before fixing and writes a final root-cause report.",
       "tags": ["debugging", "testing", "quality"],
       "targets": ["copilot", "claude-code"],
-      "files": ["agents/debug-agent/agent.md"],
-      "manifestUrl": "agents/debug-agent/agent.md"
+      "file": "agents/debug-agent/agent.md"
     },
     {
       "name": "planner",
@@ -73,8 +66,7 @@
       "description": "Expert planning specialist for complex features and refactoring. Creates detailed, phased implementation plans with exact file paths, risk assessments, and testing strategies.",
       "tags": ["planning", "architecture", "workflow", "productivity"],
       "targets": ["claude-code"],
-      "files": ["agents/planner/agent.md"],
-      "manifestUrl": "agents/planner/agent.md"
+      "file": "agents/planner/agent.md"
     }
   ],
   "instructions": [
@@ -84,8 +76,7 @@
       "description": "Generic code review guidelines covering security, testing, performance, and architecture — prioritised as CRITICAL / IMPORTANT / SUGGESTION.",
       "tags": ["code-review", "quality", "security", "testing"],
       "targets": ["copilot", "claude-code"],
-      "files": ["instructions/code-review/instruction.md"],
-      "manifestUrl": "instructions/code-review/instruction.md"
+      "file": "instructions/code-review/instruction.md"
     },
     {
       "name": "security-owasp",
@@ -93,8 +84,7 @@
       "description": "Security-first coding instructions based on OWASP Top 10 — covers injection, access control, cryptography, misconfiguration, and more.",
       "tags": ["security", "owasp", "best-practices"],
       "targets": ["copilot", "claude-code"],
-      "files": ["instructions/security-owasp/instruction.md"],
-      "manifestUrl": "instructions/security-owasp/instruction.md"
+      "file": "instructions/security-owasp/instruction.md"
     },
     {
       "name": "secure-coding",
@@ -102,8 +92,7 @@
       "description": "Non-negotiable secure coding standards covering input validation, secrets management, authentication, error handling, dependency hygiene, and PII handling.",
       "tags": ["security", "best-practices", "owasp", "standards"],
       "targets": ["claude-code", "copilot"],
-      "files": ["instructions/secure-coding/instruction.md"],
-      "manifestUrl": "instructions/secure-coding/instruction.md"
+      "file": "instructions/secure-coding/instruction.md"
     }
   ],
   "commands": [
@@ -113,11 +102,18 @@
       "description": "Generate a structured pull request description from git diff. Produces a reviewer-friendly summary with type-of-change, test plan, and notes sections.",
       "tags": ["git", "pull-request", "workflow", "documentation"],
       "targets": ["claude-code"],
-      "files": ["commands/write-pr-description/command.md"],
-      "manifestUrl": "commands/write-pr-description/command.md"
+      "file": "commands/write-pr-description/command.md"
     }
   ],
   "hooks": [
+    {
+      "name": "ai-coauthor-hook",
+      "version": "1.0.0",
+      "description": "Automatically tags git commits with Co-authored-by and AI-modified: trailers when staged files were written by Claude Code or GitHub Copilot coding agent. Cross-platform Node.js scripts — no bash required.",
+      "tags": ["git", "attribution", "copilot", "claude-code", "commits", "workflow"],
+      "targets": ["claude-code", "copilot"],
+      "folder": "hooks/ai-coauthor-hook"
+    },
     {
       "name": "post-edit-typecheck",
       "version": "1.0.0",
@@ -145,6 +141,15 @@
       "tags": ["workflow", "planning", "git", "commits", "hooks", "productivity"],
       "targets": ["claude-code", "copilot"],
       "folder": "plugins/dev-workflow"
+    },
+    {
+      "name": "specship",
+      "version": "1.1.0",
+      "description": "Spec-driven Squad plugin. Absorbs OpenSpec's workflow into Squad as a native ceremony — a Speccer agent assesses ideas, produces spec artifacts, gates on human approval, then the Coordinator routes tasks.md to the right squad members.",
+      "tags": ["workflow", "spec-driven", "squad", "openspec", "planning"],
+      "targets": ["claude-code"],
+      "folder": "plugins/specship",
+      "hasScripts": true
     }
   ]
 }

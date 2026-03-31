@@ -27,8 +27,7 @@ const sampleAsset: RegistryAsset = {
   description: 'A test skill',
   tags: ['test'],
   targets: ['claude-code'],
-  files: ['main.md'],
-  manifestUrl: 'https://example.com/manifest.json',
+  file: 'main.md',
   registryName: 'community',
 };
 
@@ -127,7 +126,7 @@ describe('planInstall', () => {
       'https://example.com/',
     );
 
-    expect(plan.asset).toEqual(sampleAsset);
+    expect(plan.asset).toEqual({ ...sampleAsset, files: ['main.md'] });
     expect(plan.targets).toEqual(['claude-code']);
     expect(plan.scope).toBe('project');
     expect(Object.keys(plan.files).length).toBeGreaterThan(0);
@@ -201,7 +200,7 @@ describe('dryRunInstall', () => {
       null,
     );
 
-    expect(plan.asset).toEqual(sampleAsset);
+    expect(plan.asset).toEqual({ ...sampleAsset, files: ['main.md'] });
     expect(Object.keys(plan.files).length).toBeGreaterThan(0);
 
     const skillDir = path.join(tmpDir, '.claude', 'skills', 'test-skill');
@@ -298,8 +297,6 @@ describe('planInstall + executeInstall — script hashes', () => {
     description: 'Plugin with setup script',
     tags: ['test'],
     targets: ['claude-code'],
-    files: ['plugins/my-plugin/setup.js'],
-    manifestUrl: 'https://example.com/plugins/my-plugin/manifest.json',
     folder: 'plugins/my-plugin',
     registryName: 'community',
   };

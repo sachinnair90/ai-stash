@@ -79,7 +79,7 @@ export function InstallView({ assets, onDone, onCancel, registryBaseUrl, registr
     setInstalling(true);
 
     for (const asset of assets) {
-      const fileStatuses: InstallFileStatus[] = asset.files.map((f) => ({
+      const fileStatuses: InstallFileStatus[] = (asset.files ?? (asset.file ? [asset.file] : [])).map((f) => ({
         file: f,
         status: 'pending' as const,
       }));
@@ -241,6 +241,7 @@ export function InstallView({ assets, onDone, onCancel, registryBaseUrl, registr
           assetName={plan.asset.name}
           scripts={scriptNames}
           scriptRisksContent={plan.scriptRisksContent}
+          hasDeclaredScriptRisks={!!plan.manifest?.scriptRisks}
           onAccept={() => {
             const ts = new Date().toISOString();
             setAcceptedRisks((prev) => {

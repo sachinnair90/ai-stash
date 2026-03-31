@@ -1,0 +1,11 @@
+{
+  "files": [
+    "hook-config.json",
+    "copilot-hooks.json",
+    "hooks/track-ai-edits.mjs",
+    "hooks/session-stop.mjs",
+    "hooks/session-start.mjs",
+    "scripts/prepare-commit-msg.mjs",
+    "scripts/post-commit.mjs"
+  ]
+}

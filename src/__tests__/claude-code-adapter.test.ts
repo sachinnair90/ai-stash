@@ -16,7 +16,6 @@ function makeAsset(overrides: Partial<RegistryAsset> = {}): RegistryAsset {
     tags: [],
     targets: ['claude-code'],
     files: ['main.md'],
-    manifestUrl: 'https://example.com/manifest.json',
     registryName: 'test',
     ...overrides,
   };

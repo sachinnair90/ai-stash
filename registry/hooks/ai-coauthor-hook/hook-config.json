@@ -1,0 +1,22 @@
+{
+  "hooks": [
+    {
+      "name": "track-ai-edits",
+      "description": "Records every file the AI edits into a session log. Used by the prepare-commit-msg git hook to append Co-authored-by and AI-modified: trailers at commit time.",
+      "event": "PostToolUse",
+      "matcher": "Edit|MultiEdit|Write",
+      "command": "node .claude/hooks/ai-coauthor-hook/track-ai-edits.mjs",
+      "timeout": 10000,
+      "async": true
+    },
+    {
+      "name": "ai-session-stop",
+      "description": "Prints a summary of AI-touched files at the end of the session so the developer can review before committing.",
+      "event": "Stop",
+      "matcher": "",
+      "command": "node .claude/hooks/ai-coauthor-hook/session-stop.mjs",
+      "timeout": 10000,
+      "async": false
+    }
+  ]
+}
